@@ -1,0 +1,53 @@
+using System;
+using Unity;
+using Unity.Lifetime;
+using TemplateBuilder.Application.Options;
+using TemplateBuilder.Application.Services;
+using TemplateBuilder.Domain.Interfaces;
+using TemplateBuilder.Editor.Mvc5.Authorization;
+using TemplateBuilder.Infrastructure.EF6.Data;
+using TemplateBuilder.Infrastructure.EF6.Repositories;
+
+namespace TemplateBuilder.Editor.Mvc5;
+
+public static class UnityContainerExtensions
+{
+    public static IUnityContainer RegisterTemplateBuilderEditor(
+        this IUnityContainer container,
+        Action<TemplateBuilderEditorOptions> configure)
+    {
+        var options = new TemplateBuilderEditorOptions();
+        configure(options);
+
+        if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            throw new InvalidOperationException(
+                "TemplateBuilder.Editor.Mvc5 requires a connection string. " +
+                "Set options.ConnectionString in RegisterTemplateBuilderEditor().");
+
+        var connectionString = options.ConnectionString;
+
+        // HierarchicalLifetimeManager == Unity.Mvc5's per-request scope, via its
+        // child-container-per-HTTP-request pattern (UnityPerRequestHttpModule).
+        container.RegisterFactory<TemplateBuilderDbContext>(
+            c => new TemplateBuilderDbContext(connectionString),
+            new HierarchicalLifetimeManager());
+
+        container.RegisterType<ITemplateRepository, TemplateRepository>(new HierarchicalLifetimeManager());
+        container.RegisterType<ISnippetRepository, SnippetRepository>(new HierarchicalLifetimeManager());
+        container.RegisterType<IHtmlSanitizerService, HtmlSanitizerService>(new ContainerControlledLifetimeManager());
+        container.RegisterType<ITemplateEngine, TemplateEngine>(new HierarchicalLifetimeManager());
+        container.RegisterInstance(new TemplateBuilderOptions());
+        container.RegisterFactory<ISqlViewDiscoveryService>(
+            c => new SqlViewDiscoveryService(connectionString, c.Resolve<TemplateBuilderOptions>()),
+            new HierarchicalLifetimeManager());
+
+        TemplateBuilderAuthorizationFilter.Configure(options.Authorization);
+
+        // Triggers EF6 MigrateDatabaseToLatestVersion on first access — mirrors the ASP.NET Core
+        // MigrationHostedService's "migrate on startup" behavior without a hosted-service concept in MVC5.
+        using var migrationContext = new TemplateBuilderDbContext(connectionString);
+        migrationContext.Database.Initialize(force: false);
+
+        return container;
+    }
+}
