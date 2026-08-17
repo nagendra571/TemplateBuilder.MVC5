@@ -41,3 +41,24 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
 - [x] `/Templates/_setup` all checks PASS
 - [ ] Binding-redirect guidance in `install.ps1` validated against a real `packages.config`-style install — **deferred to client integration** (needs the client's actual dependency versions)
 - [ ] Bootstrap 3.3.7 / jQuery 3.7.1 / IgniteUI CSS collision checked against a real Bootstrap-v3 host page — **deferred to client integration** (sample host by design loads no Bootstrap)
+## Post-build: package consumption validated in the sample host (2026-08-17)
+
+- `mono nuget.exe install TemplateBuilder.Editor.Mvc5 -Version 1.0.0 -Source ./nupkg` into
+  `samples/TemplateBuilder.SampleMvc5Host/packages/` (packages.config-style layout) pulled the
+  package + full dependency tree.
+- Found + fixed a packaging bug: the nuspec was missing the runtime deps of the bundled
+  netstandard2.0 assemblies (Scriban 7.2.6 needs `System.Text.Json` at render time; its own
+  netstandard2.0 dependency group is not honored for net48 consumers — BLOCKERS #16). Editor
+  csproj now declares `System.Text.Json 10.0.8` explicitly → nuspec carries it.
+- Sample csproj rewritten: all references point at `packages\` lib paths (no editor-bin
+  dependency); `CopyPackageAssemblies` target ships the runtime-only netstandard2.0/net462
+  closure (Scriban, HtmlSanitizer, AngleSharp(+Css), Microsoft.Extensions.*, System.Text.Json,
+  System.IO.Pipelines, shims, WebPages/Razor 3.0.0.0 dlls — mono xbuild resolves the WebPages
+  family from the GAC, BLOCKERS #16). Clean xbuild: 0 errors, 41 dlls.
+- Full flow re-verified against the package-consumed build on xsp4: list, form create (302 →
+  Edit), JSON SaveVersion (`{"versionId":6,"versionNumber":2}`), duplicate-name rejection
+  (VALIDATION_ERROR), Preview with modelJson (200), Validate, Versions (v2), Restore, Snippets,
+  assets 200 with correct content-types, `/_setup` 3× PASS.
+- `packages/` dir is gitignored — restore with the `nuget.exe install` command above
+  (`-ConfigFile /tmp/opencode/nuget-cfg.txt` is machine-local; on Windows use VS Package
+  Manager with the local `nupkg/` folder as source).

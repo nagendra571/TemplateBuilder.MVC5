@@ -8,6 +8,16 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <!-- Runtime dependencies of the bundled Domain/Application/Infrastructure.EF6 assemblies:
+         the ProjectReferences above carry PrivateAssets=all (their dlls are bundled into
+         lib/net48 by BundleInternalAssemblies), so their package dependencies must be
+         declared here explicitly or a consumer gets FileNotFoundException at runtime. -->
+    <PackageReference Include="EntityFramework" Version="6.5.1" />
+    <PackageReference Include="Scriban" Version="7.2.6" />
+    <PackageReference Include="System.Text.Json" Version="10.0.8" />
+    <PackageReference Include="HtmlSanitizer" Version="9.2.995" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Microsoft.AspNet.Mvc" Version="5.3.0" />
     <PackageReference Include="Unity" Version="5.11.10" />
     <PackageReference Include="Unity.Mvc5" Version="1.4.0" />

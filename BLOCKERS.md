@@ -340,3 +340,28 @@ first-match walk). Request-time routing was unaffected. **Fix:** the route is no
 asset route can only route requests, never generate URLs.
 
 ---
+## 16. packages.config installs ignore netstandard2.0 dependency groups (missing runtime deps)
+
+`nuget install` of the first `TemplateBuilder.Editor.Mvc5` build into the sample host's
+packages.config-style `packages/` dir resolved only the nuspec's explicit dependencies —
+Scriban 7.2.6's *own* netstandard2.0 dependency group (`System.Text.Json 10.0.8`,
+`Microsoft.CSharp 4.7.0`, `System.Threading.Tasks.Extensions 4.6.3`) was not pulled in for a
+net48 consumer, even though the netstandard2.0 `Scriban.dll` needs `System.Text.Json` at runtime
+(Scriban's `Template.Parse`/`Render` loads STJ types). Result: preview/validate rendered →
+`TypeLoadException: Failure has occurred while loading a type` wrapped into the 400
+`TEMPLATE_RENDER_ERROR`.
+
+**Fix (package-level):** the editor csproj declares an explicit `<PackageReference
+Include="System.Text.Json" Version="10.0.8" />` so the nuspec carries it (its transitive
+`System.IO.Pipelines` then flows to packages.config consumers automatically). Consumers of the
+bundled netstandard2.0 assemblies (Scriban/HtmlSanitizer/AngleSharp) must supply
+System.Text.Json 10.0.8+ themselves if installing without the nuspec closure.
+
+**Sample-host gotchas hit while proving this:**
+- Mono `xbuild` resolves `System.Web.WebPages*`/`System.Web.Razor` references from the GAC
+  (2.0.0.0) ignoring HintPath, so those Mvc-5.3.0 dlls never land in `bin/` → RazorGenerator's
+  `PrecompiledMvcEngine` TypeLoadException. The `CopyPackageAssemblies` target copies them
+  explicitly from `Microsoft.AspNet.WebPages.3.3.0`/`Microsoft.AspNet.Razor.3.3.0` packages.
+- System.Text.Json 10.0.8 (netstandard2.0) also needs `System.IO.Pipelines.dll` in `bin/` —
+  NuGet installs the package but it must be copied explicitly (see `CopyPackageAssemblies`).
+---
