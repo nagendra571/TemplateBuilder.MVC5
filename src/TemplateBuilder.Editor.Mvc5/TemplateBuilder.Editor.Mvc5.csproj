@@ -68,5 +68,17 @@
     <PackageTags>template;scriban;html;editor;mvc5;netframework</PackageTags>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="tools\install.ps1" Pack="true" PackagePath="tools\" Visible="false" />
+    <None Include="README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+  <Target Name="BundleInternalAssemblies" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="$(OutputPath)TemplateBuilder.Domain.dll" Pack="true" PackagePath="lib\$(TargetFramework)\" Visible="false" />
+      <None Include="$(OutputPath)TemplateBuilder.Application.dll" Pack="true" PackagePath="lib\$(TargetFramework)\" Visible="false" />
+      <None Include="$(OutputPath)TemplateBuilder.Infrastructure.EF6.dll" Pack="true" PackagePath="lib\$(TargetFramework)\" Visible="false" />
+    </ItemGroup>
+  </Target>
 </Project>
