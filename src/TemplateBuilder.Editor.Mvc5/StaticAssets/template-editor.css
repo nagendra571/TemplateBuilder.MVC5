@@ -1,0 +1,388 @@
+/*
+ * TemplateBuilder.Editor.Mvc5 - template-editor.css
+ * Reconstructed for the MVC5 fork (origin wwwroot asset absent - see BLOCKERS.md).
+ * Every rule is scoped under #tb-editor-host so the editor UI cannot collide with
+ * the host application's own CSS framework (client uses Bootstrap 3.3.7).
+ */
+
+#tb-editor-host {
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #2b2b2b;
+}
+
+#tb-editor-host * {
+    box-sizing: border-box;
+}
+
+#tb-editor-host h1 {
+    font-size: 22px;
+    margin: 0 0 12px 0;
+    color: #1a1a1a;
+}
+
+#tb-editor-host h2 {
+    font-size: 16px;
+    margin: 0 0 8px 0;
+    color: #1a1a1a;
+}
+
+#tb-editor-host .tb-page-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+#tb-editor-host .tb-version-label {
+    background: #eef2f7;
+    border: 1px solid #d5dde8;
+    border-radius: 10px;
+    padding: 2px 10px;
+    font-size: 13px;
+    color: #47566b;
+}
+
+#tb-editor-host .tb-form {
+    max-width: 860px;
+}
+
+#tb-editor-host .tb-field {
+    margin-bottom: 14px;
+}
+
+#tb-editor-host .tb-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #33415c;
+}
+
+#tb-editor-host .tb-text-input,
+#tb-editor-host .tb-textarea,
+#tb-editor-host .tb-code-editor,
+#tb-editor-host .tb-select,
+#tb-editor-host .tb-search-input,
+#tb-editor-host .tb-type-select {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #c3cdd9;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 14px;
+    color: #2b2b2b;
+    background: #ffffff;
+}
+
+#tb-editor-host .tb-code-editor {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre;
+}
+
+#tb-editor-host .tb-select {
+    width: auto;
+    min-width: 180px;
+}
+
+#tb-editor-host .tb-field-error {
+    color: #b3261e;
+    font-size: 13px;
+    display: block;
+    margin-top: 3px;
+}
+
+#tb-editor-host .tb-validation-summary {
+    color: #b3261e;
+    margin-bottom: 14px;
+}
+
+#tb-editor-host .tb-btn {
+    display: inline-block;
+    padding: 7px 16px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    vertical-align: middle;
+}
+
+#tb-editor-host .tb-btn-primary {
+    background: #1f6feb;
+    border-color: #1f6feb;
+    color: #ffffff;
+}
+
+#tb-editor-host .tb-btn-primary:hover {
+    background: #195bc4;
+    border-color: #195bc4;
+}
+
+#tb-editor-host .tb-btn-secondary {
+    background: #ffffff;
+    border-color: #c3cdd9;
+    color: #33415c;
+}
+
+#tb-editor-host .tb-btn-secondary:hover {
+    background: #f0f4f9;
+}
+
+#tb-editor-host .tb-btn-sm {
+    padding: 4px 10px;
+    font-size: 13px;
+}
+
+#tb-editor-host .tb-button-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+#tb-editor-host .tb-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+#tb-editor-host .tb-toolbar .tb-text-input {
+    width: 220px;
+}
+
+#tb-editor-host .tb-filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#tb-editor-host .tb-filter-bar .tb-search-input {
+    width: 260px;
+}
+
+#tb-editor-host .tb-count-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+#tb-editor-host .tb-count-chip {
+    background: #eef2f7;
+    border: 1px solid #d5dde8;
+    border-radius: 12px;
+    padding: 2px 10px;
+    font-size: 12px;
+    color: #47566b;
+}
+
+#tb-editor-host .tb-empty {
+    color: #6b7686;
+    font-style: italic;
+    padding: 18px 0;
+}
+
+#tb-editor-host .tb-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+#tb-editor-host .tb-table th,
+#tb-editor-host .tb-table td {
+    border: 1px solid #d5dde8;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 14px;
+}
+
+#tb-editor-host .tb-table th {
+    background: #f0f4f9;
+    font-weight: 600;
+    color: #33415c;
+}
+
+#tb-editor-host .tb-table tr:nth-child(even) td {
+    background: #fafbfd;
+}
+
+#tb-editor-host .tb-preview-section {
+    max-width: 860px;
+    margin-top: 20px;
+    border-top: 1px solid #d5dde8;
+    padding-top: 16px;
+}
+
+#tb-editor-host .tb-preview-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#tb-editor-host .tb-preview-controls label {
+    font-weight: 600;
+    color: #33415c;
+    margin-right: 4px;
+}
+
+#tb-editor-host .tb-preview-json {
+    width: 100%;
+}
+
+#tb-editor-host .tb-preview-output {
+    border: 1px solid #c3cdd9;
+    border-radius: 4px;
+    padding: 12px;
+    background: #ffffff;
+    min-height: 60px;
+    overflow-x: auto;
+}
+
+#tb-editor-host .tb-preview-loading {
+    color: #47566b;
+    font-style: italic;
+}
+
+#tb-editor-host .tb-version-history-section {
+    max-width: 860px;
+    margin-top: 24px;
+}
+
+#tb-editor-host .tb-version-history-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+#tb-editor-host .tb-version-history-table th,
+#tb-editor-host .tb-version-history-table td {
+    border: 1px solid #d5dde8;
+    padding: 7px 10px;
+    text-align: left;
+    font-size: 13px;
+}
+
+#tb-editor-host .tb-version-history-table th {
+    background: #f0f4f9;
+    font-weight: 600;
+    color: #33415c;
+}
+
+#tb-editor-host .tb-setup-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+#tb-editor-host .tb-setup-table th,
+#tb-editor-host .tb-setup-table td {
+    border: 1px solid #d5dde8;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 14px;
+    vertical-align: top;
+}
+
+#tb-editor-host .tb-setup-table th {
+    background: #f0f4f9;
+    font-weight: 600;
+    color: #33415c;
+}
+
+#tb-editor-host .tb-setup-pass {
+    color: #187a3d;
+    font-weight: 600;
+}
+
+#tb-editor-host .tb-setup-fail {
+    color: #b3261e;
+    font-weight: 600;
+}
+
+#tb-editor-host .tb-setup-fix {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    background: #f7f8fa;
+    border: 1px solid #e2e6ec;
+    border-radius: 3px;
+    padding: 6px 8px;
+    margin-top: 6px;
+    white-space: pre-wrap;
+}
+
+#tb-editor-host .tb-manual-list {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+}
+
+#tb-editor-host .tb-manual-list li {
+    margin-bottom: 6px;
+}
+
+#tb-editor-host.tb-theme-dark {
+    background: #1e2228;
+    color: #d7dce3;
+}
+
+#tb-editor-host.tb-theme-dark h1,
+#tb-editor-host.tb-theme-dark h2 {
+    color: #e8ecf2;
+}
+
+#tb-editor-host.tb-theme-dark .tb-text-input,
+#tb-editor-host.tb-theme-dark .tb-textarea,
+#tb-editor-host.tb-theme-dark .tb-code-editor,
+#tb-editor-host.tb-theme-dark .tb-select,
+#tb-editor-host.tb-theme-dark .tb-search-input,
+#tb-editor-host.tb-theme-dark .tb-type-select,
+#tb-editor-host.tb-theme-dark .tb-preview-output {
+    background: #262b33;
+    border-color: #3a4250;
+    color: #d7dce3;
+}
+
+#tb-editor-host.tb-theme-dark .tb-btn-secondary {
+    background: #262b33;
+    border-color: #3a4250;
+    color: #d7dce3;
+}
+
+#tb-editor-host.tb-theme-dark .tb-btn-secondary:hover {
+    background: #313947;
+}
+
+#tb-editor-host.tb-theme-dark .tb-table th,
+#tb-editor-host.tb-theme-dark .tb-version-history-table th,
+#tb-editor-host.tb-theme-dark .tb-setup-table th {
+    background: #262b33;
+    color: #d7dce3;
+}
+
+#tb-editor-host.tb-theme-dark .tb-table td,
+#tb-editor-host.tb-theme-dark .tb-version-history-table td,
+#tb-editor-host.tb-theme-dark .tb-setup-table td {
+    border-color: #3a4250;
+}
+
+#tb-editor-host.tb-theme-dark .tb-table tr:nth-child(even) td {
+    background: #232830;
+}
+
+#tb-editor-host.tb-theme-dark .tb-count-chip,
+#tb-editor-host.tb-theme-dark .tb-version-label {
+    background: #262b33;
+    border-color: #3a4250;
+    color: #aeb9c7;
+}
+
+#tb-editor-host.tb-theme-dark .tb-setup-fix {
+    background: #232830;
+    border-color: #3a4250;
+    color: #c9d3df;
+}

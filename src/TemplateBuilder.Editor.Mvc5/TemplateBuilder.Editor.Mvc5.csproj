@@ -21,6 +21,10 @@
       <Generator>RazorGenerator</Generator>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="StaticAssets\template-editor.js" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.template-editor.js" />
+    <EmbeddedResource Include="StaticAssets\template-editor.css" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.template-editor.css" />
+  </ItemGroup>
   <PropertyGroup>
     <!-- RazorGenerator.MsBuild's RazorCodeGen task targets Microsoft.Build.Utilities.v4.0 (the
          .NET Framework MSBuild) and cannot load under dotnet's Core MSBuild (MSB4062). On the
