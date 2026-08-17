@@ -33,6 +33,8 @@ public sealed class TemplateBuilderStaticAssetsRouteHandler : IRouteHandler, IHt
         {
             "css/template-editor.css" => ("StaticAssets.template-editor.css", "text/css"),
             "js/template-editor.js" => ("StaticAssets.template-editor.js", "application/javascript"),
+            "css/suneditor.min.css" => ("StaticAssets.suneditor.min.css", "text/css"),
+            "js/suneditor.min.js" => ("StaticAssets.suneditor.min.js", "application/javascript"),
             _ => (null, null)
         };
 

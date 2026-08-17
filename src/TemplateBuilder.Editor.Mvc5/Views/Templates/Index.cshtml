@@ -1,63 +1,210 @@
+@using System.Linq
 @using TemplateBuilder.Editor.Mvc5.Models
 @model TemplateListViewModel
 
-<div id="tb-editor-host">
-    <div class="tb-page-header">
-        <h1>Templates</h1>
-        <a href="@Url.Action("Create", "Templates")" class="tb-btn tb-btn-primary" id="tb-create-template">Create Template</a>
-    </div>
+<div id="tb-editor-host" class="tb-theme-light tb-index-page">
+    @Html.AntiForgeryToken()
 
-    <form method="get" action="@Url.Action("Index", "Templates")" class="tb-filter-bar" id="tb-filter-form">
-        <input type="text" name="search" value="@Model.Search" placeholder="Search templates..." class="tb-search-input" id="tb-search" />
-        <select name="type" class="tb-type-select" id="tb-type-filter">
-            <option value="">All types</option>
-            @foreach (var type in TemplateListViewModel.KnownTypes)
-            {
-                <option value="@type" @(Model.TypeFilter == type ? "selected" : "")>@type</option>
-            }
-        </select>
-        <button type="submit" class="tb-btn tb-btn-secondary">Filter</button>
-    </form>
+    <div class="tb-page-content">
 
-    <div class="tb-count-bar">
-        @foreach (var kvp in Model.CountByType)
-        {
-            <span class="tb-count-chip">@kvp.Key: @kvp.Value</span>
-        }
-    </div>
+        <!-- Page Header -->
+        <div class="tb-page-header">
+            <div>
+                <h1 class="tb-page-title">Templates</h1>
+                <p style="color:var(--text-muted);font-size:13px;margin-top:2px;">Manage your reusable document templates</p>
+            </div>
+            <a class="btn btn-primary" href="@Url.Action("Create", "Templates")">+ New Template</a>
+        </div>
 
-    @if (!Model.Templates.Any())
-    {
-        <p class="tb-empty">No templates found.@(string.IsNullOrWhiteSpace(Model.Search) ? "" : " Try adjusting the search or filter.")</p>
-    }
-    else
-    {
-        <table class="tb-table" id="tb-template-list">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Version</th>
-                    <th>Status</th>
-                    <th>Updated</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var template in Model.Templates)
+        <!-- Layout: main list + stats sidebar -->
+        <div class="tb-list-layout">
+            <div class="tb-list-main">
+
+                <!-- Search + Filter -->
+                <form method="get" action="@Url.Action("Index", "Templates")" class="tb-search-row" role="search">
+                    <div style="flex:1;max-width:320px;">
+                        <label for="search-input" class="visually-hidden">Search templates</label>
+                        <input type="search" id="search-input" name="search" value="@Model.Search" placeholder="Search templates…" />
+                    </div>
+                    <div>
+                        <label for="type-filter" class="visually-hidden">Filter by type</label>
+                        <select id="type-filter" name="type" style="width:160px;">
+                            <option value="">All Types</option>
+                            @foreach (var type in TemplateListViewModel.KnownTypes)
+                            {
+                                <option value="@type" @(Model.TypeFilter == type ? "selected" : "")>@type</option>
+                            }
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Filter</button>
+                </form>
+
+                <!-- Template Table -->
+                @if (!Model.Templates.Any())
                 {
-                    <tr>
-                        <td>@template.Name</td>
-                        <td>@template.TemplateType</td>
-                        <td>@(template.CurrentVersion?.VersionNumber ?? 0)</td>
-                        <td>@(template.IsActive ? "Active" : "Inactive")</td>
-                        <td>@template.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                        <td>
-                            <a href="@Url.Action("Edit", "Templates", new { id = template.Id })" class="tb-btn tb-btn-secondary tb-btn-sm">Edit</a>
-                        </td>
-                    </tr>
+                    <div class="card tb-empty-state">
+                        <p>No templates found.@(string.IsNullOrWhiteSpace(Model.Search) ? "" : " Try adjusting the search or filter.")</p>
+                    </div>
                 }
-            </tbody>
-        </table>
-    }
+                else
+                {
+                    <div class="card" style="overflow:hidden;">
+                        <table class="tb-list-table" role="table" aria-label="Template list">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Name</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Version</th>
+                                    <th scope="col">Updated</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col" style="text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var template in Model.Templates)
+                                {
+                                    <tr id="row-@template.Id">
+                                        <td class="tb-col-name">@template.Name</td>
+                                        <td>
+                                            <span class="tb-badge tb-badge-@template.TemplateType.ToLowerInvariant()">@template.TemplateType</span>
+                                        </td>
+                                        <td class="tb-col-meta">v@(template.CurrentVersion?.VersionNumber ?? 0)</td>
+                                        <td class="tb-col-meta">@template.UpdatedAt.ToString("dd MMM yyyy")</td>
+                                        <td>
+                                            <span id="status-@template.Id"
+                                                  class="tb-badge @(template.IsActive ? "tb-badge-live" : "tb-badge-draft")">
+                                                @(template.IsActive ? "Active" : "Inactive")
+                                            </span>
+                                        </td>
+                                        <td class="tb-col-actions">
+                                            <div style="display:flex;gap:4px;justify-content:flex-end;">
+                                                <a class="btn btn-sm btn-secondary" href="@Url.Action("Edit", "Templates", new { id = template.Id })">Edit</a>
+                                                <button type="button" class="btn btn-sm btn-secondary"
+                                                        data-template-name="@template.Name"
+                                                        onclick="openDuplicateModal(@template.Id, this.dataset.templateName)">Duplicate</button>
+                                                <button type="button" class="btn btn-sm btn-secondary"
+                                                        id="toggle-btn-@template.Id"
+                                                        onclick="toggleActive(@template.Id, this)">
+                                                    @(template.IsActive ? "Disable" : "Enable")
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+
+            <!-- Stats Sidebar -->
+            @if (Model.Templates.Any())
+            {
+                <div class="card tb-stats-sidebar">
+                    <div style="padding:14px 16px 6px;border-bottom:1px solid var(--border);">
+                        <h3 style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.6px;">Quick Stats</h3>
+                    </div>
+                    <div style="padding:10px 16px 14px;">
+                        <div class="tb-stat-total">@Model.Templates.Count</div>
+                        <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;">Total templates</div>
+                        @foreach (var kvp in Model.CountByType)
+                        {
+                            <div class="tb-stat-row">
+                                <span class="tb-stat-label">@kvp.Key</span>
+                                <span class="tb-stat-value">@kvp.Value</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+    </div>
+
+    <!-- Duplicate Modal -->
+    <div class="modal-overlay" id="duplicate-modal" role="dialog" aria-modal="true" aria-labelledby="duplicate-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="duplicate-modal-title" class="modal-title">Duplicate Template</span>
+                <button class="modal-close" aria-label="Close" onclick="closeDuplicateModal()">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <label for="duplicate-name-input">New Template Name</label>
+                    <input type="text" id="duplicate-name-input" autocomplete="off" />
+                </div>
+                <div class="tb-modal-actions">
+                    <button class="btn btn-secondary" onclick="closeDuplicateModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmDuplicate()">Duplicate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
+
+<script>
+    const _csrf = document.querySelector('input[name=__RequestVerificationToken]')?.value ?? '';
+
+    async function toggleActive(id, btn) {
+        btn.disabled = true;
+        const res = await fetch(`/Templates/${id}/ToggleActive`, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': _csrf }
+        });
+        btn.disabled = false;
+        if (res.ok) {
+            const data = await res.json();
+            const statusEl = document.getElementById(`status-${id}`);
+            statusEl.className = `tb-badge ${data.isActive ? 'tb-badge-live' : 'tb-badge-draft'}`;
+            statusEl.textContent = data.isActive ? 'Active' : 'Inactive';
+            btn.textContent = data.isActive ? 'Disable' : 'Enable';
+        } else {
+            const err = await res.json().catch(() => null);
+            alert(err?.message ?? 'Failed to update template status.');
+        }
+    }
+
+    let _duplicateSourceId = null;
+
+    function openDuplicateModal(id, name) {
+        _duplicateSourceId = id;
+        document.getElementById('duplicate-name-input').value = `Copy of ${name}`;
+        document.getElementById('duplicate-modal').classList.add('open');
+        setTimeout(() => document.getElementById('duplicate-name-input').focus(), 50);
+    }
+
+    function closeDuplicateModal() {
+        document.getElementById('duplicate-modal').classList.remove('open');
+        _duplicateSourceId = null;
+    }
+
+    async function confirmDuplicate() {
+        const newName = document.getElementById('duplicate-name-input').value.trim();
+        if (!newName) return;
+        const confirmBtn = document.querySelector('#duplicate-modal .btn-primary');
+        confirmBtn.disabled = true;
+        const res = await fetch(`/Templates/${_duplicateSourceId}/Duplicate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': _csrf
+            },
+            body: JSON.stringify({ newName })
+        });
+        confirmBtn.disabled = false;
+        if (res.ok) {
+            const { id } = await res.json();
+            window.location.href = `/Templates/${id}/Edit`;
+        } else {
+            const err = await res.json().catch(() => null);
+            alert(err?.message ?? 'Failed to duplicate template.');
+            closeDuplicateModal();
+        }
+    }
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && document.getElementById('duplicate-modal').classList.contains('open'))
+            closeDuplicateModal();
+    });
+</script>

@@ -3,10 +3,12 @@
 <head>
     <meta charset="utf-8" />
     <title>@ViewBag.Title - Template Builder Editor</title>
+    <link href="/TemplateBuilderEditor/css/suneditor.min.css" rel="stylesheet" />
     <link href="/TemplateBuilderEditor/css/template-editor.css" rel="stylesheet" />
 </head>
 <body>
     @RenderBody()
+    <script src="/TemplateBuilderEditor/js/suneditor.min.js"></script>
     <script src="/TemplateBuilderEditor/js/template-editor.js"></script>
     @RenderSection("Scripts", required: false)
 </body>

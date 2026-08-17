@@ -34,6 +34,8 @@
   <ItemGroup>
     <EmbeddedResource Include="StaticAssets\template-editor.js" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.template-editor.js" />
     <EmbeddedResource Include="StaticAssets\template-editor.css" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.template-editor.css" />
+    <EmbeddedResource Include="StaticAssets\suneditor.min.js" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.suneditor.min.js" />
+    <EmbeddedResource Include="StaticAssets\suneditor.min.css" LogicalName="TemplateBuilder.Editor.Mvc5.StaticAssets.suneditor.min.css" />
   </ItemGroup>
   <PropertyGroup>
     <!-- RazorGenerator.MsBuild's RazorCodeGen task targets Microsoft.Build.Utilities.v4.0 (the

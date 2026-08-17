@@ -2,42 +2,41 @@
 @using TemplateBuilder.Domain.Entities
 @model (List<TemplateVersion> Versions, int? CurrentVersionId)
 
-<h2>Version History</h2>
-
 @if (!Model.Versions.Any())
 {
-    <p class="tb-empty">No versions saved yet.</p>
+    <p style="color:var(--text-muted);font-size:13px;padding:12px 0;">No versions saved yet.</p>
 }
 else
 {
-    <table class="tb-table" id="tb-version-history-table">
-        <thead>
-            <tr>
-                <th>Version</th>
-                <th>Comment</th>
-                <th>Created By</th>
-                <th>Created At</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var version in Model.Versions.OrderByDescending(v => v.VersionNumber))
+    foreach (var version in Model.Versions.OrderByDescending(v => v.VersionNumber))
+    {
+        var isCurrent = version.Id == Model.CurrentVersionId;
+        <div class="tb-version-card @(isCurrent ? "is-current" : "")" data-version-id="@version.Id">
+            <div class="tb-version-header">
+                <span class="tb-version-num">v@(version.VersionNumber)</span>
+                @if (isCurrent)
+                {
+                    <span class="tb-version-badge">Current</span>
+                }
+                <span class="tb-version-meta" style="margin-left:auto;">@version.CreatedAt.ToString("dd MMM yyyy")@(!string.IsNullOrWhiteSpace(version.CreatedBy) ? " · " + version.CreatedBy : "")</span>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(version.ChangeComment))
             {
-                var isCurrent = version.Id == Model.CurrentVersionId;
-                <tr data-version-id="@version.Id" data-version-number="@version.VersionNumber" class="@(isCurrent ? "tb-current-version" : "")">
-                    <td>v@(version.VersionNumber)@(isCurrent ? " (current)" : "")</td>
-                    <td>@(string.IsNullOrWhiteSpace(version.ChangeComment) ? "—" : version.ChangeComment)</td>
-                    <td>@(string.IsNullOrWhiteSpace(version.CreatedBy) ? "—" : version.CreatedBy)</td>
-                    <td>@version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
-                    <td>
-                        <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm tb-view-version">View</button>
-                        @if (!isCurrent)
-                        {
-                            <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm tb-restore-version">Restore</button>
-                        }
-                    </td>
-                </tr>
+                <div class="tb-version-comment">@version.ChangeComment</div>
             }
-        </tbody>
-    </table>
+            <div style="display:flex;gap:6px;margin-top:8px;">
+                <button type="button" class="btn btn-sm btn-secondary"
+                        data-version-id="@version.Id"
+                        data-version-num="@version.VersionNumber"
+                        data-comment="@(version.ChangeComment ?? "")"
+                        data-created-at="@version.CreatedAt.ToString("dd MMM yyyy")"
+                        onclick="openCompareView(this)">Compare</button>
+                @if (!isCurrent)
+                {
+                    <button type="button" class="btn btn-sm btn-primary"
+                            onclick="restoreVersion(this, @version.Id, @version.VersionNumber)">Restore</button>
+                }
+            </div>
+        </div>
+    }
 }

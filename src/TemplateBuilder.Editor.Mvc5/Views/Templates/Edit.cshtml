@@ -2,100 +2,363 @@
 @model TemplateEditorViewModel
 
 <div id="tb-editor-host">
-    <div class="tb-page-header">
-        <h1>@(Model.Id.HasValue ? "Edit Template" : "Create Template")</h1>
-        @if (Model.Id.HasValue)
-        {
-            <span class="tb-version-label">v@(Model.CurrentVersionNumber)</span>
-        }
-    </div>
-
     @Html.ValidationSummary(true, "", new { @class = "tb-validation-summary" })
 
-    @using (Html.BeginForm(Model.Id.HasValue ? "SaveVersion" : "Create", "Templates",
-        Model.Id.HasValue ? (object)new { id = Model.Id } : null, FormMethod.Post,
-        new { id = "tb-template-form", @class = "tb-form" }))
-    {
+    <form id="editor-form" method="post" action="@Url.Action(Model.Id.HasValue ? "SaveVersion" : "Create", "Templates", Model.Id.HasValue ? (object)new { id = Model.Id } : null)">
         @Html.AntiForgeryToken()
         @Html.HiddenFor(m => m.Id)
         @Html.HiddenFor(m => m.CurrentVersionId)
         @Html.HiddenFor(m => m.CurrentVersionNumber)
 
-        <div class="tb-field">
-            @Html.LabelFor(m => m.Name, "Name")
-            @Html.TextBoxFor(m => m.Name, new { @class = "tb-text-input", maxlength = 200, id = "tb-template-name" })
-            @Html.ValidationMessageFor(m => m.Name, "", new { @class = "tb-field-error" })
-        </div>
+        <div class="tb-editor-grid">
 
-        <div class="tb-field">
-            @Html.LabelFor(m => m.TemplateType, "Type")
-            @Html.DropDownListFor(m => m.TemplateType,
-                new SelectList(TemplateListViewModel.KnownTypes, Model.TemplateType),
-                new { @class = "tb-select", id = "tb-template-type" })
-            @Html.ValidationMessageFor(m => m.TemplateType, "", new { @class = "tb-field-error" })
-        </div>
+            <!-- LEFT: Field Palette -->
+            <div class="tb-panel-left">
+                <div class="tb-panel-heading" id="palette-heading"><span class="tb-heading-icon">&#8854;</span> FIELD PALETTE</div>
+                <div class="tb-view-selector-row">
+                    <label for="view-selector">SQL View</label>
+                    <select id="view-selector">
+                        <option value="">&#8212; Select a view &#8212;</option>
+                        @foreach (var view in Model.AvailableViews)
+                        {
+                            <option value="@view">@view</option>
+                        }
+                    </select>
+                </div>
+                <div id="field-palette" aria-live="polite">
+                    <div class="tb-palette-msg">Select a view to see fields</div>
+                </div>
+                <div class="tb-blocks-section">
+                    <div class="tb-section-label">BLOCKS</div>
+                    <div class="tb-blocks-list">
+                        <div class="palette-block" draggable="true" data-block="loop">Loop Block</div>
+                        <div class="palette-block" draggable="true" data-block="grid">Grid Block</div>
+                    </div>
+                </div>
+                <div class="tb-snippets-section">
+                    <div class="tb-section-label">SNIPPETS</div>
+                    <div id="snippet-list" aria-live="polite">
+                        <div class="tb-palette-msg">Loading snippets&#8230;</div>
+                    </div>
+                    <button type="button" id="btn-save-snippet" class="tb-snippet-save-btn"
+                            title="Save selected editor content as a reusable snippet">
+                        <span aria-hidden="true">&#8853;</span> Save selection as snippet&#8230;
+                    </button>
+                </div>
+            </div>
 
-        <div class="tb-field">
-            @Html.LabelFor(m => m.Description, "Description")
-            @Html.TextAreaFor(m => m.Description, 3, 60, new { @class = "tb-textarea", id = "tb-template-description", maxlength = 500 })
-            @Html.ValidationMessageFor(m => m.Description, "", new { @class = "tb-field-error" })
-        </div>
+            <!-- CENTER: Canvas -->
+            <div class="tb-panel-center">
+                <div class="tb-panel-heading">
+                    <span class="tb-heading-icon">&#9998;</span> CANVAS
+                    <div class="tb-heading-actions">
+                        <button type="button" id="btn-autosave-toggle" class="tb-autosave-toggle" aria-label="Toggle auto-save"></button>
+                        <button type="button" id="btn-theme-toggle" class="tb-theme-toggle" aria-label="Toggle theme"></button>
+                    </div>
+                </div>
+                <div id="tb-draft-banner" class="tb-draft-banner" hidden role="alert">
+                    <span class="tb-draft-banner-icon">&#128190;</span>
+                    <span class="tb-draft-banner-text">Unsaved draft found (<span id="draft-age"></span>). Restore it or discard to keep the current saved version.</span>
+                    <div class="tb-draft-banner-actions">
+                        <button type="button" id="btn-draft-restore" class="btn btn-sm btn-primary">Restore draft</button>
+                        <button type="button" id="btn-draft-discard" class="btn btn-sm btn-secondary">Discard</button>
+                    </div>
+                </div>
+                <div id="validate-panel" class="tb-validate-panel" hidden>
+                    <span id="validate-msg"></span>
+                    <button type="button" id="btn-validate-dismiss" class="tb-validate-dismiss" aria-label="Dismiss">&#x2715;</button>
+                </div>
+                <div class="tb-canvas-body">
+                    <textarea id="template-body" name="Body" spellcheck="false">@Model.Body</textarea>
+                </div>
+                <div id="tb-word-count" class="tb-word-count" aria-live="polite">
+                    <span>Words: <strong id="wc-words">0</strong></span>
+                    <span class="tb-wc-sep">&#183;</span>
+                    <span>Characters: <strong id="wc-chars">0</strong></span>
+                    <span class="tb-wc-sep">&#183;</span>
+                    <span>No spaces: <strong id="wc-nospace">0</strong></span>
+                    <span id="wc-draft-status" class="tb-draft-status"></span>
+                </div>
+            </div>
 
-        <div class="tb-field">
-            @Html.LabelFor(m => m.Body, "Body (Scriban template)")
-            @Html.TextAreaFor(m => m.Body, 18, 100, new { @class = "tb-code-editor", id = "tb-template-body", spellcheck = "false" })
-            @Html.ValidationMessageFor(m => m.Body, "", new { @class = "tb-field-error" })
-        </div>
-
-        <div class="tb-button-bar">
-            @if (Model.Id.HasValue)
-            {
-                <input type="text" id="tb-change-comment" class="tb-text-input" maxlength="500" placeholder="Change comment (optional)" style="width:300px;" />
-                <button type="submit" class="tb-btn tb-btn-primary" id="tb-save-version">Save Version</button>
-                <button type="button" class="tb-btn tb-btn-secondary" id="tb-validate-template">Validate</button>
-                <button type="button" class="tb-btn tb-btn-secondary" id="tb-toggle-active">Toggle Active</button>
-                <button type="button" class="tb-btn tb-btn-secondary" id="tb-duplicate-template">Duplicate</button>
-            }
-            else
-            {
-                <button type="submit" class="tb-btn tb-btn-primary" id="tb-create-submit">Create</button>
-            }
-        </div>
-
-        <div class="tb-toolbar">
-            <input type="text" id="tb-find-text" class="tb-text-input" placeholder="Find..." />
-            <input type="text" id="tb-replace-text" class="tb-text-input" placeholder="Replace with..." />
-            <button type="button" class="tb-btn tb-btn-secondary" id="tb-replace-all">Replace All</button>
-        </div>
-    }
-
-    <div class="tb-preview-section">
-        <div class="tb-preview-controls">
-            <h2>Preview</h2>
-            @if (Model.AvailableViews.Any())
-            {
-                <label for="tb-available-views">View:</label>
-                <select id="tb-available-views" class="tb-select">
-                    <option value="">(none)</option>
-                    @foreach (var view in Model.AvailableViews)
+            <!-- RIGHT: Properties -->
+            <div class="tb-panel-right">
+                <div class="tb-panel-heading"><span class="tb-heading-icon">&#9881;</span> PROPERTIES</div>
+                <div class="tb-props-body">
+                    <div>
+                        <label for="prop-name">Template Name</label>
+                        <input id="prop-name" type="text" name="Name" value="@Model.Name" maxlength="200" />
+                        @Html.ValidationMessageFor(m => m.Name, "", new { @class = "tb-field-error" })
+                    </div>
+                    <div>
+                        <label for="prop-type">Type</label>
+                        <select id="prop-type" name="TemplateType">
+                            @foreach (var type in TemplateListViewModel.KnownTypes)
+                            {
+                                <option value="@type" @(Model.TemplateType == type ? "selected" : "")>@type</option>
+                            }
+                        </select>
+                        @Html.ValidationMessageFor(m => m.TemplateType, "", new { @class = "tb-field-error" })
+                    </div>
+                    <div>
+                        <label for="prop-desc">Description</label>
+                        <textarea id="prop-desc" rows="2" name="Description" maxlength="500">@Model.Description</textarea>
+                        @Html.ValidationMessageFor(m => m.Description, "", new { @class = "tb-field-error" })
+                    </div>
+                    @if (Model.Id.HasValue)
                     {
-                        <option value="@view">@view</option>
+                        <div>
+                            <label>Version</label>
+                            <div class="tb-version-row">
+                                <span id="version-display">v @Model.CurrentVersionNumber</span>
+                                <button type="button" id="btn-history" class="btn btn-sm btn-secondary">History</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="save-comment">Save Note (optional)</label>
+                            <input type="text" id="save-comment" placeholder="What changed?" />
+                        </div>
                     }
-                </select>
-                <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm" id="tb-load-columns">Load Columns</button>
-            }
-            <label for="tb-preview-model-json">Model JSON:</label>
-            <textarea id="tb-preview-model-json" class="tb-code-editor tb-preview-json" rows="6" spellcheck="false"></textarea>
-            <button type="button" class="tb-btn tb-btn-primary tb-btn-sm" id="tb-render-preview">Render Preview</button>
-            <div class="tb-preview-loading" id="tb-preview-loading" style="display:none;">Rendering...</div>
+                </div>
+                <div class="tb-props-footer">
+                    <div id="save-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                    @if (Model.Id.HasValue)
+                    {
+                        <button type="button" id="btn-preview" class="btn btn-secondary">Preview</button>
+                        <button type="button" id="btn-save" class="btn btn-primary">Save Version</button>
+                    }
+                    else
+                    {
+                        <button type="submit" id="btn-create-submit" class="btn btn-primary">Create Template</button>
+                    }
+                </div>
+            </div>
         </div>
-        <div id="tb-preview-output" class="tb-preview-output"></div>
+    </form>
+
+    <!-- Version History Modal -->
+    <div class="modal-overlay" id="version-modal" role="dialog" aria-modal="true" aria-labelledby="version-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="version-modal-title" class="modal-title">Version History</span>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div id="restore-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+            <div class="modal-body" id="version-history-content">Loading&#8230;</div>
+        </div>
     </div>
 
-    @if (Model.Id.HasValue)
-    {
-        <div class="tb-version-history-section">
-            <div id="tb-version-history" data-url="@Url.Action("GetVersionHistory", "Templates", new { id = Model.Id })">Loading version history...</div>
+    <!-- Compare Modal -->
+    <div class="modal-overlay" id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-modal-title">
+        <div class="modal modal--compare">
+            <div class="modal-header">
+                <span id="compare-modal-title" class="modal-title">Compare Versions</span>
+                <button type="button" id="btn-compare-back-history" class="btn btn-sm btn-secondary">&#8592; History</button>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div id="compare-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+            <div class="compare-panels">
+                <div class="compare-panel">
+                    <div class="compare-panel-header">
+                        <span id="compare-current-num" class="tb-version-num"></span>
+                        <span class="tb-version-badge">Current</span>
+                        <span class="compare-panel-meta"></span>
+                    </div>
+                    <div class="compare-iframe-wrap">
+                        <div class="compare-loading" id="compare-loading-current">Loading&#8230;</div>
+                        <iframe id="compare-iframe-current" class="compare-iframe"
+                                sandbox="allow-same-origin" title="Current version preview"></iframe>
+                    </div>
+                    <div class="compare-panel-actions">
+                        <button type="button" id="btn-compare-keep" class="btn btn-sm btn-secondary">Keep Current</button>
+                    </div>
+                </div>
+                <div class="compare-panel">
+                    <div class="compare-panel-header">
+                        <span id="compare-old-num" class="tb-version-num"></span>
+                        <span id="compare-old-meta" class="compare-panel-meta"></span>
+                    </div>
+                    <div class="compare-iframe-wrap">
+                        <div class="compare-loading" id="compare-loading-old">Loading&#8230;</div>
+                        <iframe id="compare-iframe-old" class="compare-iframe"
+                                sandbox="allow-same-origin" title="Selected version preview"></iframe>
+                    </div>
+                    <div class="compare-panel-actions">
+                        <button type="button" id="btn-compare-restore" class="btn btn-sm btn-primary">Restore</button>
+                    </div>
+                </div>
+            </div>
         </div>
-    }
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title">
+        <div class="modal">
+            <div class="modal-header">
+                <span id="preview-modal-title" class="modal-title">Live Preview</span>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+                        <label for="preview-json" style="margin:0;">Sample Data (JSON)</label>
+                        <button type="button" id="btn-gen-sample" class="btn btn-ghost btn-sm"
+                                title="Auto-fill sample values from {{ model.X }} placeholders in the template">
+                            &#9889; Auto-fill from template
+                        </button>
+                    </div>
+                    <textarea id="preview-json" class="tb-code-textarea" rows="8"
+                              placeholder='{ "FieldName": "value" }'>{}</textarea>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-render">Render</button>
+                <div id="preview-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                <div class="tb-preview-frame-wrap" id="preview-frame-wrap" style="display:none;">
+                    <iframe id="preview-frame" class="tb-preview-frame" title="Template preview"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loop Wizard Modal -->
+    <div class="modal-overlay" id="loop-modal" role="dialog" aria-modal="true" aria-labelledby="loop-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="loop-modal-title" class="modal-title">Insert Loop</span>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <label for="loop-collection">Collection (view field or name)</label>
+                    <input type="text" id="loop-collection" placeholder="e.g. Items" autocomplete="off" list="loop-collection-list">
+                    <datalist id="loop-collection-list"></datalist>
+                </div>
+                <div class="tb-form-row">
+                    <label for="loop-alias">Item alias</label>
+                    <input type="text" id="loop-alias" placeholder="e.g. item" value="item">
+                </div>
+                <div class="tb-form-row">
+                    <label>Starter template</label>
+                    <div class="tb-radio-group">
+                        <label><input type="radio" name="loop-starter" value="empty" checked> Empty</label>
+                        <label><input type="radio" name="loop-starter" value="list"> Bullet list</label>
+                        <label><input type="radio" name="loop-starter" value="table"> Table</label>
+                    </div>
+                </div>
+                <div id="loop-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                <div class="tb-modal-actions">
+                    <button type="button" id="btn-loop-insert" class="btn btn-primary">Insert</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conditional Wizard Modal -->
+    <div class="modal-overlay" id="conditional-modal" role="dialog" aria-modal="true" aria-labelledby="conditional-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="conditional-modal-title" class="modal-title">Insert Conditional</span>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <label for="cond-field">Field</label>
+                    <input type="text" id="cond-field" placeholder="e.g. model.Status" autocomplete="off" list="cond-field-list">
+                    <datalist id="cond-field-list"></datalist>
+                </div>
+                <div class="tb-form-row">
+                    <label for="cond-operator">Operator</label>
+                    <select id="cond-operator">
+                        <option value="==">== (equals)</option>
+                        <option value="!=">!= (not equals)</option>
+                        <option value="&gt;">&gt; (greater than)</option>
+                        <option value="&lt;">&lt; (less than)</option>
+                        <option value="contains">contains</option>
+                        <option value="!= null">!= null (exists)</option>
+                    </select>
+                </div>
+                <div class="tb-form-row" id="cond-value-row">
+                    <label for="cond-value">Value</label>
+                    <input type="text" id="cond-value" placeholder="e.g. Active">
+                </div>
+                <div class="tb-form-row">
+                    <label><input type="checkbox" id="cond-include-else"> Include else branch</label>
+                </div>
+                <div id="cond-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                <div class="tb-modal-actions">
+                    <button type="button" id="btn-cond-insert" class="btn btn-primary">Insert</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Snippet Modal -->
+    <div class="modal-overlay" id="save-snippet-modal" role="dialog" aria-modal="true" aria-labelledby="save-snippet-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="save-snippet-modal-title" class="modal-title">Save as Snippet</span>
+                <button class="modal-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <label for="snippet-name">Name</label>
+                    <input type="text" id="snippet-name" placeholder="e.g. Standard Footer" maxlength="100">
+                </div>
+                <div class="tb-form-row">
+                    <label for="snippet-desc">Description (optional)</label>
+                    <input type="text" id="snippet-desc" placeholder="e.g. Address and disclaimer block" maxlength="300">
+                </div>
+                <div id="snippet-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                <div class="tb-modal-actions">
+                    <button type="button" id="btn-snippet-save" class="btn btn-primary">Save Snippet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Find & Replace floating panel (non-blocking — no overlay) -->
+    <div id="find-replace-panel" class="tb-find-replace" hidden role="dialog" aria-label="Find and Replace">
+        <div class="tb-fr-header">
+            <span class="tb-fr-title">Find &amp; Replace</span>
+            <button type="button" id="btn-fr-close" class="tb-fr-close" aria-label="Close">&#x2715;</button>
+        </div>
+        <div class="tb-fr-body">
+            <div class="tb-fr-row">
+                <label for="fr-find" class="tb-fr-label">Find</label>
+                <input type="search" id="fr-find" class="tb-fr-input" autocomplete="off" placeholder="Search&#8230;">
+            </div>
+            <div id="fr-match-count" class="tb-fr-count"></div>
+            <div class="tb-fr-row">
+                <label for="fr-replace" class="tb-fr-label">Replace</label>
+                <input type="text" id="fr-replace" class="tb-fr-input" autocomplete="off" placeholder="Replace with&#8230;">
+            </div>
+            <div class="tb-fr-options">
+                <label class="tb-fr-check"><input type="checkbox" id="fr-case-sensitive"> Case sensitive</label>
+                <label class="tb-fr-check"><input type="checkbox" id="fr-whole-word"> Whole word</label>
+            </div>
+            <div class="tb-fr-actions">
+                <button type="button" id="btn-fr-prev" class="btn btn-sm btn-secondary">&#9664; Prev</button>
+                <button type="button" id="btn-fr-next" class="btn btn-sm btn-secondary">Next &#9654;</button>
+                <button type="button" id="btn-fr-replace" class="btn btn-sm btn-secondary">Replace</button>
+                <button type="button" id="btn-fr-replace-all" class="btn btn-sm btn-primary">Replace All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Special Characters floating panel (non-blocking — no overlay) -->
+    <div id="special-chars-panel" class="tb-special-chars" hidden role="dialog" aria-label="Special Characters">
+        <div class="tb-sc-header">
+            <span class="tb-sc-title">Special Characters</span>
+            <button type="button" id="btn-sc-close" class="tb-sc-close" aria-label="Close">&#x2715;</button>
+        </div>
+        <div class="tb-sc-search-row">
+            <input type="search" id="sc-search" class="tb-sc-search" placeholder="Search&#8230;" autocomplete="off">
+        </div>
+        <div id="sc-groups" class="tb-sc-groups"></div>
+    </div>
+
 </div>
+
+<script>
+    const templateId = @(Model.Id ?? 0);
+    const currentVersionNumber = @Model.CurrentVersionNumber;
+</script>

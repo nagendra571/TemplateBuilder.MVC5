@@ -62,3 +62,29 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
 - `packages/` dir is gitignored — restore with the `nuget.exe install` command above
   (`-ConfigFile /tmp/opencode/nuget-cfg.txt` is machine-local; on Windows use VS Package
   Manager with the local `nupkg/` folder as source).
+
+## 2026-08-17 — Editor UI/UX parity with .NET 8/10 origin (Tasks 1–10 of the parity plan)
+
+- Gap analysis: server surface already 1:1 (all routes/payloads). The entire gap was
+  frontend — closed by porting the origin's own assets + markup (approach A, see spec
+  `docs/superpowers/specs/2026-08-17-parity-editor-ui-design.md`).
+- SunEditor 2.47.10 embedded as embedded resources (no CDN — corporate client):
+  `suneditor.min.js` (~2.5 MB) + `suneditor.min.css`; served by
+  `TemplateBuilderStaticAssetsRouteHandler`; verified in the DLL via
+  `GetManifestResourceNames`.
+- `template-editor.css` = origin 1356 lines + 57-line compat block (setup/probe page
+  classes live inside `#tb-editor-host`); `template-editor.js` = origin 2098 lines with one
+  adaptation: `SUNEDITOR.create` init guarded by `#template-body` presence so the JS is
+  safe to load on any page (Index/Setup).
+- Views rewritten: `Index.cshtml` (stats sidebar, type/status badges, search, duplicate
+  modal, inline toggle), `Edit.cshtml` (3-panel: field palette + blocks + snippets / SunEditor
+  canvas + draft banner + validate + word count / properties + version row + save),
+  `_VersionHistory.cshtml` (cards + Compare/Restore buttons with data-* contract for the
+  compare modal). Create mode: `templateId = 0`, no version UI, form posts to `Create`.
+- nupkg verified: 4 DLLs + install.ps1 + README, no `.cshtml` leakage. Sample host rebuilt
+  from package (0 errors), full xsp4 smoke green (see DASHBOARD.md for the marker list).
+- Mono/xsp4 quirk (test-tooling only): curl bodies containing a *nested JSON object*
+  (`"modelJson":{...}`) fail the JSON anti-forgery header check with HttpAntiForgeryException
+  — mono's form parser chokes on nested objects. The real client always sends string values
+  (form fields/textarea), so this is unreachable in production; validated the exact JS
+  payloads pass.
