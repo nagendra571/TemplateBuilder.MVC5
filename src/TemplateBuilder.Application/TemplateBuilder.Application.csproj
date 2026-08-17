@@ -4,7 +4,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="HtmlSanitizer" Version="9.2.995" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageReference Include="Scriban" Version="7.2.6" />

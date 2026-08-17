@@ -1,0 +1,42 @@
+@using TemplateBuilder.Editor.Mvc5.Models
+@model List<SetupCheckResult>
+
+<div id="tb-editor-host">
+    <h1>Template Builder — Setup Check</h1>
+    <p>Run from the sample host in <code>Debug</code> configuration. Each check below reports on one requirement of the editor package.</p>
+
+    <table class="tb-table" id="tb-setup-checks">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Check</th>
+                <th>Description</th>
+                <th>If failing</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var check in Model)
+            {
+                <tr class="@(check.Passed ? "tb-check-pass" : "tb-check-fail")">
+                    <td>@(check.Passed ? "PASS" : "FAIL")</td>
+                    <td>@check.Name</td>
+                    <td>
+                        @check.Description
+                        @if (!string.IsNullOrWhiteSpace(check.Detail))
+                        {
+                            <div class="tb-check-detail">@check.Detail</div>
+                        }
+                    </td>
+                    <td>@check.Fix</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h2>Verify manually in the browser</h2>
+    <ul class="tb-manual-checks">
+        <li><code>/TemplateBuilderEditor/css/template-editor.css</code> and <code>/TemplateBuilderEditor/js/template-editor.js</code> return HTTP 200 with the correct Content-Type.</li>
+        <li>Open <a href="@Url.Action("LayoutProbe", "Setup")">the layout probe</a> and confirm the editor renders inside <code>#tb-editor-host</code> unaffected by host-page styles.</li>
+        <li>Create and edit a template, then confirm preview, version history, restore, and snippets behave as expected.</li>
+    </ul>
+</div>

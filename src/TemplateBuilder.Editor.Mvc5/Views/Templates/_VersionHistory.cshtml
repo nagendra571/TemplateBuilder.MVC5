@@ -1,0 +1,43 @@
+@using System.Linq
+@using TemplateBuilder.Domain.Entities
+@model (List<TemplateVersion> Versions, int? CurrentVersionId)
+
+<h2>Version History</h2>
+
+@if (!Model.Versions.Any())
+{
+    <p class="tb-empty">No versions saved yet.</p>
+}
+else
+{
+    <table class="tb-table" id="tb-version-history-table">
+        <thead>
+            <tr>
+                <th>Version</th>
+                <th>Comment</th>
+                <th>Created By</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var version in Model.Versions.OrderByDescending(v => v.VersionNumber))
+            {
+                var isCurrent = version.Id == Model.CurrentVersionId;
+                <tr data-version-id="@version.Id" data-version-number="@version.VersionNumber" class="@(isCurrent ? "tb-current-version" : "")">
+                    <td>v@(version.VersionNumber)@(isCurrent ? " (current)" : "")</td>
+                    <td>@(string.IsNullOrWhiteSpace(version.ChangeComment) ? "—" : version.ChangeComment)</td>
+                    <td>@(string.IsNullOrWhiteSpace(version.CreatedBy) ? "—" : version.CreatedBy)</td>
+                    <td>@version.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td>
+                        <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm tb-view-version">View</button>
+                        @if (!isCurrent)
+                        {
+                            <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm tb-restore-version">Restore</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

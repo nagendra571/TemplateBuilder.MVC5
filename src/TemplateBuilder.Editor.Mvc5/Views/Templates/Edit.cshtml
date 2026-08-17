@@ -1,0 +1,100 @@
+@using TemplateBuilder.Editor.Mvc5.Models
+@model TemplateEditorViewModel
+
+<div id="tb-editor-host">
+    <div class="tb-page-header">
+        <h1>@(Model.Id.HasValue ? "Edit Template" : "Create Template")</h1>
+        @if (Model.Id.HasValue)
+        {
+            <span class="tb-version-label">v@(Model.CurrentVersionNumber)</span>
+        }
+    </div>
+
+    @Html.ValidationSummary(true, "", new { @class = "tb-validation-summary" })
+
+    @using (Html.BeginForm(Model.Id.HasValue ? "SaveVersion" : "Create", "Templates",
+        Model.Id.HasValue ? (object)new { id = Model.Id } : null, FormMethod.Post,
+        new { id = "tb-template-form", @class = "tb-form" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(m => m.Id)
+        @Html.HiddenFor(m => m.CurrentVersionId)
+        @Html.HiddenFor(m => m.CurrentVersionNumber)
+
+        <div class="tb-field">
+            @Html.LabelFor(m => m.Name, "Name")
+            @Html.TextBoxFor(m => m.Name, new { @class = "tb-text-input", maxlength = 200, id = "tb-template-name" })
+            @Html.ValidationMessageFor(m => m.Name, "", new { @class = "tb-field-error" })
+        </div>
+
+        <div class="tb-field">
+            @Html.LabelFor(m => m.TemplateType, "Type")
+            @Html.DropDownListFor(m => m.TemplateType,
+                new SelectList(TemplateListViewModel.KnownTypes, Model.TemplateType),
+                new { @class = "tb-select", id = "tb-template-type" })
+            @Html.ValidationMessageFor(m => m.TemplateType, "", new { @class = "tb-field-error" })
+        </div>
+
+        <div class="tb-field">
+            @Html.LabelFor(m => m.Description, "Description")
+            @Html.TextAreaFor(m => m.Description, 3, 60, new { @class = "tb-textarea", id = "tb-template-description", maxlength = 500 })
+            @Html.ValidationMessageFor(m => m.Description, "", new { @class = "tb-field-error" })
+        </div>
+
+        <div class="tb-field">
+            @Html.LabelFor(m => m.Body, "Body (Scriban template)")
+            @Html.TextAreaFor(m => m.Body, 18, 100, new { @class = "tb-code-editor", id = "tb-template-body", spellcheck = "false" })
+            @Html.ValidationMessageFor(m => m.Body, "", new { @class = "tb-field-error" })
+        </div>
+
+        <div class="tb-button-bar">
+            @if (Model.Id.HasValue)
+            {
+                <button type="submit" class="tb-btn tb-btn-primary" id="tb-save-version">Save Version</button>
+                <button type="button" class="tb-btn tb-btn-secondary" id="tb-validate-template">Validate</button>
+                <button type="button" class="tb-btn tb-btn-secondary" id="tb-toggle-active">Toggle Active</button>
+                <button type="button" class="tb-btn tb-btn-secondary" id="tb-duplicate-template">Duplicate</button>
+            }
+            else
+            {
+                <button type="submit" class="tb-btn tb-btn-primary" id="tb-create-submit">Create</button>
+            }
+        </div>
+
+        <div class="tb-toolbar">
+            <input type="text" id="tb-find-text" class="tb-text-input" placeholder="Find..." />
+            <input type="text" id="tb-replace-text" class="tb-text-input" placeholder="Replace with..." />
+            <button type="button" class="tb-btn tb-btn-secondary" id="tb-replace-all">Replace All</button>
+        </div>
+    }
+
+    <div class="tb-preview-section">
+        <div class="tb-preview-controls">
+            <h2>Preview</h2>
+            @if (Model.AvailableViews.Any())
+            {
+                <label for="tb-available-views">View:</label>
+                <select id="tb-available-views" class="tb-select">
+                    <option value="">(none)</option>
+                    @foreach (var view in Model.AvailableViews)
+                    {
+                        <option value="@view">@view</option>
+                    }
+                </select>
+                <button type="button" class="tb-btn tb-btn-secondary tb-btn-sm" id="tb-load-columns">Load Columns</button>
+            }
+            <label for="tb-preview-model-json">Model JSON:</label>
+            <textarea id="tb-preview-model-json" class="tb-code-editor tb-preview-json" rows="6" spellcheck="false"></textarea>
+            <button type="button" class="tb-btn tb-btn-primary tb-btn-sm" id="tb-render-preview">Render Preview</button>
+            <div class="tb-preview-loading" id="tb-preview-loading" style="display:none;">Rendering...</div>
+        </div>
+        <div id="tb-preview-output" class="tb-preview-output"></div>
+    </div>
+
+    @if (Model.Id.HasValue)
+    {
+        <div class="tb-version-history-section">
+            <div id="tb-version-history" data-url="@Url.Action("GetVersionHistory", "Templates", new { id = Model.Id })">Loading version history...</div>
+        </div>
+    }
+</div>

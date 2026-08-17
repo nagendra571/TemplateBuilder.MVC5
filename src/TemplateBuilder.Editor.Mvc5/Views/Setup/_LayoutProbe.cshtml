@@ -1,0 +1,40 @@
+<div id="tb-editor-host">
+    <h1>Layout Probe</h1>
+    <p>This page renders the editor's markup inside <code>#tb-editor-host</code> so you can visually confirm the editor's scoped CSS does not collide with the host page's styles (Bootstrap 3, IgniteUI, etc.).</p>
+
+    <h2>Headings and text</h2>
+    <p>Paragraph with <strong>bold</strong>, <em>italic</em>, and <a href="#">a link</a>.</p>
+
+    <h2>Form controls</h2>
+    <div class="tb-field">
+        <label for="tb-probe-text">Text input</label>
+        <input type="text" id="tb-probe-text" class="tb-text-input" placeholder="Sample text" />
+    </div>
+    <div class="tb-field">
+        <label for="tb-probe-select">Select</label>
+        <select id="tb-probe-select" class="tb-select">
+            <option>Option one</option>
+            <option>Option two</option>
+        </select>
+    </div>
+    <div class="tb-field">
+        <label for="tb-probe-textarea">Textarea</label>
+        <textarea id="tb-probe-textarea" class="tb-textarea" rows="3"></textarea>
+    </div>
+    <div class="tb-button-bar">
+        <button type="button" class="tb-btn tb-btn-primary">Primary</button>
+        <button type="button" class="tb-btn tb-btn-secondary">Secondary</button>
+        <button type="button" class="tb-btn tb-btn-danger">Danger</button>
+    </div>
+
+    <h2>Table</h2>
+    <table class="tb-table">
+        <thead>
+            <tr><th>Column A</th><th>Column B</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>a1</td><td>b1</td></tr>
+            <tr><td>a2</td><td>b2</td></tr>
+        </tbody>
+    </table>
+</div>

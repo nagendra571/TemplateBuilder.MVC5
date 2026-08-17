@@ -1,4 +1,4 @@
-using Microsoft.Data.SqlClient;
+using System.Data.SqlClient;
 using TemplateBuilder.Domain.Exceptions;
 
 namespace TemplateBuilder.Application.Services;

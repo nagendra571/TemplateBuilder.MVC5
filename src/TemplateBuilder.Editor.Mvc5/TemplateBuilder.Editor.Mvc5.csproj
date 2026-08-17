@@ -35,6 +35,8 @@
       <RazorGenToolsDir>$(NuGetPackageRoot)razorgenerator.msbuild\2.5.0\tools\</RazorGenToolsDir>
     </PropertyGroup>
     <MakeDir Directories="$(RazorGenRunDir)" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/obj/CodeGen" />
+    <MakeDir Directories="$(MSBuildProjectDirectory)/obj/CodeGen" />
     <ItemGroup>
       <RazorGenV1 Include="$(RazorGenToolsDir)v1\*.dll" />
       <RazorGenV2 Include="$(RazorGenToolsDir)v2\*.dll" />

@@ -236,3 +236,59 @@ then hosted the MVC5 sample host successfully (Task 11 gate passed).
 real ASP.NET hosting); it's purely this sandbox's mono-6.8 + Debian-stale-package story.
 
 ---
+## 12. mono's HttpContext.Current does not flow through async continuations; MDS 7.0.2 cannot run on mono/Linux
+
+**Context (both discovered while running Task 12's real views through the sample host):**
+
+1. **`HttpContext.Current` is null on async continuation threads under mono/xsp4.** mono
+   implements `HttpContext.Current` via `CallContext.GetData("c")` (System.Web `HttpContext.cs`,
+   `get { return (HttpContext) CallContext.GetData ("c"); }`), and CallContext data does not flow
+   through the task continuations MVC5's `AsyncControllerActionInvoker` uses for
+   `async Task<ActionResult>` actions. The editor's controllers are async (as in the origin), so
+   after the first `await` the action body, the view render, and `ExecuteResult` all run on a
+   thread pool thread where `HttpContext.Current == null` — which NREs
+   `Unity.Mvc5.UnityDependencyResolver.get_ChildContainer` (`HttpContext.Current.Items[..]`).
+   Every request 500'd with the same NRE; sync actions worked fine. IIS/.NET Framework flows
+   CallContext through continuations, so **this is a mono/xsp4-only problem** — the client's
+   Windows environment is unaffected.
+
+   **Fix (sample host only):** `MonoFlowActionInvoker : AsyncControllerActionInvoker` in
+   `samples/TemplateBuilder.SampleMvc5Host/Infrastructure/` — captures `HttpContext.Current` in
+   `BeginInvokeActionMethod` (runs on the request thread) and restores it in
+   `EndInvokeActionMethod` (runs on the continuation thread, before `ExecuteResult`), registered
+   via `container.RegisterType<IActionInvoker, MonoFlowActionInvoker>()`. The precompiled views,
+   the per-request child container (`RequestLifetimeHttpModule` auto-registers via
+   `PreApplicationStartCode`), and view-page activation then all work again. Do not add
+   `UnityPerRequestHttpModule` to web.config on mono — its EndRequest handler
+   (`DisposeOfChildContainer`) also reads `HttpContext.Current` and 500s at pipeline end.
+
+2. **`Microsoft.Data.SqlClient` 7.0.2 (net48) cannot run on mono/Linux at all.** Its static ctor
+   `SqlClientDiagnostics..cctor` unconditionally constructs `SqlClientMetrics`, which on
+   net48 always calls `EnablePerformanceCounters()` → `GetInstanceName()` →
+   `Interop.Windows.Kernel32.GetCurrentProcessId()` — a kernel32 P/Invoke that
+   `EntryPointNotFoundException`s on Linux (no AppContext switch to disable it — verified in
+   dotnet/SqlClient source). Even if that were bypassed, MDS's SNI native layer is Windows-only,
+   so connecting on mono/Linux is impossible.
+
+   **Decision (deliberate fork deviation from the origin repo):** the two `Application` services
+   that use MDS — `SqlViewDiscoveryService` and `SchemaVersionValidator` — now use
+   `System.Data.SqlClient` (built into .NET Framework), and the MDS package reference was removed
+   from `TemplateBuilder.Application.csproj`. This is consistent with the rest of the net48 fork
+   (EF6 + `Infrastructure.EF6` already use `System.Data.SqlClient`), removes ~10 MDS/SNI dlls
+   from the package, and is behavior-identical for these two simple INFORMATION_SCHEMA readers.
+   The origin repo (net8.0) keeps MDS. **Watch out:** if the origin's `Application` diverges in
+   future versions, this is a known fork point — see CLAUDE.md's "verbatim ports" note; this is
+   one of the documented exceptions.
+
+3. **The sample host's `Web.config` needs `<connectionStrings>` entry `TemplateBuilderDbContext`**
+   (the `TemplateBuilderDbContextFactory`'s `"name=TemplateBuilderDbContext"` string is how the
+   EF6 `MigrateDatabaseToLatestVersion` initializer's internally-created context finds its
+   connection string — the initializer cannot receive the runtime `options.ConnectionString`).
+
+**Note for the client's Windows environment:** #1 and #2 are mono/Linux-only. On IIS + net48 the
+editor uses MDS-or-`System.Data.SqlClient` fine and `UnityDependencyResolver` + async actions work
+normally. The `TrustServerCertificate=True` keyword in the sample host's connection string is
+accepted by mono's `System.Data.SqlClient` but is NOT a `System.Data.SqlClient` keyword on
+Windows — client connection strings must omit it (or use an MDS-built string).
+
+---

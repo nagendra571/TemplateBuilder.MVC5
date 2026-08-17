@@ -66,13 +66,25 @@
     <Reference Include="RazorGenerator.Mvc">
       <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\RazorGenerator.Mvc.dll</HintPath>
     </Reference>
+    <Reference Include="Unity">
+      <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\Unity.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Abstractions">
+      <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\Unity.Abstractions.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Container">
+      <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\Unity.Container.dll</HintPath>
+    </Reference>
+    <Reference Include="Unity.Mvc5">
+      <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\Unity.Mvc5.dll</HintPath>
+    </Reference>
     <Reference Include="TemplateBuilder.Editor.Mvc5">
       <HintPath>..\..\src\TemplateBuilder.Editor.Mvc5\bin\Debug\net48\TemplateBuilder.Editor.Mvc5.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\RouteConfig.cs" />
-    <Compile Include="Controllers\SpikeController.cs" />
+    <Compile Include="Infrastructure\MonoFlowActionInvoker.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>

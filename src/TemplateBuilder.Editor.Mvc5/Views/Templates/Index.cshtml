@@ -1,0 +1,63 @@
+@using TemplateBuilder.Editor.Mvc5.Models
+@model TemplateListViewModel
+
+<div id="tb-editor-host">
+    <div class="tb-page-header">
+        <h1>Templates</h1>
+        <a href="@Url.Action("Create", "Templates")" class="tb-btn tb-btn-primary" id="tb-create-template">Create Template</a>
+    </div>
+
+    <form method="get" action="@Url.Action("Index", "Templates")" class="tb-filter-bar" id="tb-filter-form">
+        <input type="text" name="search" value="@Model.Search" placeholder="Search templates..." class="tb-search-input" id="tb-search" />
+        <select name="type" class="tb-type-select" id="tb-type-filter">
+            <option value="">All types</option>
+            @foreach (var type in TemplateListViewModel.KnownTypes)
+            {
+                <option value="@type" @(Model.TypeFilter == type ? "selected" : "")>@type</option>
+            }
+        </select>
+        <button type="submit" class="tb-btn tb-btn-secondary">Filter</button>
+    </form>
+
+    <div class="tb-count-bar">
+        @foreach (var kvp in Model.CountByType)
+        {
+            <span class="tb-count-chip">@kvp.Key: @kvp.Value</span>
+        }
+    </div>
+
+    @if (!Model.Templates.Any())
+    {
+        <p class="tb-empty">No templates found.@(string.IsNullOrWhiteSpace(Model.Search) ? "" : " Try adjusting the search or filter.")</p>
+    }
+    else
+    {
+        <table class="tb-table" id="tb-template-list">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Version</th>
+                    <th>Status</th>
+                    <th>Updated</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var template in Model.Templates)
+                {
+                    <tr>
+                        <td>@template.Name</td>
+                        <td>@template.TemplateType</td>
+                        <td>@(template.CurrentVersion?.VersionNumber ?? 0)</td>
+                        <td>@(template.IsActive ? "Active" : "Inactive")</td>
+                        <td>@template.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            <a href="@Url.Action("Edit", "Templates", new { id = template.Id })" class="tb-btn tb-btn-secondary tb-btn-sm">Edit</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
