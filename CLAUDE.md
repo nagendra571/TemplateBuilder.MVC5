@@ -42,6 +42,22 @@ samples/TemplateBuilder.SampleMvc5Host/   real ASP.NET MVC5 Web Application proj
 
 ## Known open risks (from the spec — verify these, don't assume they're resolved)
 
-1. RazorGenerator precompiled-views pipeline — validated only via a trivial spike view as of plan-writing time; the real 5 views (Task 12) may surface new issues.
-2. Assembly binding redirects on the client's actual `packages.config` solution — `install.ps1` (Task 15) ships guidance, not a fully automated fix; must be validated against the real client solution before calling this "done."
-3. Bootstrap 3.3.7 / jQuery 3.7.1 / IgniteUI CSS collision — the editor's `#tb-editor-host` CSS scoping is designed to prevent this but has never been tested against a real Bootstrap v3 host page. The sample host doesn't load Bootstrap, so this specifically needs checking against the real client app.
+1. **RESOLVED (2026-08-17, Tasks 11–14):** RazorGenerator precompiled-views pipeline — validated
+   end-to-end: spike view plus all 5 real views render on xsp4 with no physical `.cshtml` files.
+   Two things learned: the Linux/Core-MSBuild codegen fallback lives in `eng/RazorGenDriver.cs`
+   (BLOCKERS #10 — `obj/CodeGen` must be regenerated when views change), and RazorGenerator views
+   DO honor a consumer's `Views/_ViewStart.cshtml` + `_Layout.cshtml` (used by the sample host to
+   wire the editor CSS/JS, mirroring the origin RCL `_content` consumer pattern).
+2. Assembly binding redirects on the client's actual `packages.config` solution — `tools/install.ps1`
+   (Task 15) ships guidance (Newtonsoft.Json 13, EntityFramework 6.5.1), not a fully automated fix;
+   must be validated against the real client solution before calling this "done."
+3. Bootstrap 3.3.7 / jQuery 3.7.1 / IgniteUI CSS collision — the editor's `#tb-editor-host` CSS
+   scoping is designed to prevent this but has never been tested against a real Bootstrap v3 host
+   page. The sample host doesn't load Bootstrap, so this specifically needs checking against the
+   real client app.
+4. Two package-level behaviors were introduced while proving Task 14 that the client WILL hit on
+   Windows too (they're not mono-specific): MVC5 has no header-based anti-forgery (stock
+   `[ValidateAntiForgeryToken]` is form-only), so JSON endpoints use the package's
+   `ValidateJsonAntiForgeryTokenAttribute` — the editor JS must send the `RequestVerificationToken`
+   header (it does); and `TemplateBuilderControllerBase.OnActionExecuting` deliberately excludes the
+   Form value provider for `application/json` requests (necessary under mono — see BLOCKERS #13/#14).
