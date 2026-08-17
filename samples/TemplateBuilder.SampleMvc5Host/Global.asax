@@ -1,0 +1,1 @@
+<%@ Application Codebehind="Global.asax.cs" Inherits="TemplateBuilder.SampleMvc5Host.MvcApplication" Language="C#" %>

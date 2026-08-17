@@ -15,6 +15,41 @@
     <PackageReference Include="RazorGenerator.Mvc" Version="2.4.9" />
     <PackageReference Include="RazorGenerator.MsBuild" Version="2.5.0" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Remove="Views/**/*.cshtml" />
+    <None Include="Views/**/*.cshtml">
+      <Generator>RazorGenerator</Generator>
+    </None>
+  </ItemGroup>
+  <PropertyGroup>
+    <!-- RazorGenerator.MsBuild's RazorCodeGen task targets Microsoft.Build.Utilities.v4.0 (the
+         .NET Framework MSBuild) and cannot load under dotnet's Core MSBuild (MSB4062). On the
+         client's Windows MSBuild the package target below runs normally; on Core MSBuild (Linux)
+         we disable it and run the same RazorGenerator.Core engine through eng/RazorGenDriver.cs
+         instead, producing identical obj/CodeGen output. See BLOCKERS.md entry #10. -->
+    <PrecompileRazorFiles Condition="'$(MSBuildRuntimeType)' == 'Core'">false</PrecompileRazorFiles>
+  </PropertyGroup>
+  <Target Name="PrecompileRazorFilesOnCore" BeforeTargets="CoreCompile" Condition="'$(MSBuildRuntimeType)' == 'Core'">
+    <PropertyGroup>
+      <RazorGenRunDir>$(MSBuildProjectDirectory)\obj\razorgen\</RazorGenRunDir>
+      <RazorGenToolsDir>$(NuGetPackageRoot)razorgenerator.msbuild\2.5.0\tools\</RazorGenToolsDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(RazorGenRunDir)" />
+    <ItemGroup>
+      <RazorGenV1 Include="$(RazorGenToolsDir)v1\*.dll" />
+      <RazorGenV2 Include="$(RazorGenToolsDir)v2\*.dll" />
+      <RazorGenV3 Include="$(RazorGenToolsDir)v3\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="$(RazorGenToolsDir)RazorGenerator.Core.dll" DestinationFolder="$(RazorGenRunDir)" />
+    <Copy SourceFiles="@(RazorGenV1)" DestinationFolder="$(RazorGenRunDir)v1\" />
+    <Copy SourceFiles="@(RazorGenV2)" DestinationFolder="$(RazorGenRunDir)v2\" />
+    <Copy SourceFiles="@(RazorGenV3)" DestinationFolder="$(RazorGenRunDir)v3\" />
+    <Exec Command="mcs -nologo -warn:0 -target:exe -out:$(RazorGenRunDir)RazorGenDriver.exe -r:$(RazorGenRunDir)RazorGenerator.Core.dll &quot;$(MSBuildProjectDirectory)\..\..\eng\RazorGenDriver.cs&quot;" />
+    <Exec Command="mono $(RazorGenRunDir)RazorGenDriver.exe --project-root $(MSBuildProjectDirectory) --codegen-dir $(MSBuildProjectDirectory)/obj/CodeGen --root-namespace $(RootNamespace)" />
+    <ItemGroup>
+      <Compile Include="$(MSBuildProjectDirectory)/obj/CodeGen/**/*.cs" />
+    </ItemGroup>
+  </Target>
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>latest</LangVersion>
