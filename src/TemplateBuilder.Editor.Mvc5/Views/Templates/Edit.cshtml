@@ -50,6 +50,7 @@
         <div class="tb-button-bar">
             @if (Model.Id.HasValue)
             {
+                <input type="text" id="tb-change-comment" class="tb-text-input" maxlength="500" placeholder="Change comment (optional)" style="width:300px;" />
                 <button type="submit" class="tb-btn tb-btn-primary" id="tb-save-version">Save Version</button>
                 <button type="button" class="tb-btn tb-btn-secondary" id="tb-validate-template">Validate</button>
                 <button type="button" class="tb-btn tb-btn-secondary" id="tb-toggle-active">Toggle Active</button>

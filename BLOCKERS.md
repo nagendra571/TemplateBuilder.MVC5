@@ -291,4 +291,52 @@ normally. The `TrustServerCertificate=True` keyword in the sample host's connect
 accepted by mono's `System.Data.SqlClient` but is NOT a `System.Data.SqlClient` keyword on
 Windows — client connection strings must omit it (or use an MDS-built string).
 
+## 13. MVC5/.NET Framework has NO header-based anti-forgery — plan's `[ValidateAntiForgeryToken]` on raw-JSON endpoints could never work (any platform)
+
+MVC5's `ValidateAntiForgeryTokenAttribute` → `AntiForgery.Validate()` → `AntiForgeryWorker.Validate(HttpContextBase)`
+→ `AntiForgeryTokenStore.GetFormToken` reads **`Request.Form` ONLY** — there is no header fallback
+on .NET Framework, on Windows or mono. Verified three independent ways: (a) IL disassembly of the
+shipped `System.Web.WebPages.dll` 3.3.0 (`GetFormToken`: `Request.Form[_config.FormFieldName]` →
+`IsNullOrEmpty` → `null` → `_serializer.Deserialize`); (b) official aspnetwebstack source at the
+`v3.3.0` tag (`ValidateAntiForgeryTokenAttribute() : this(AntiForgery.Validate)`; main-branch
+`AntiForgeryTokenStore.GetFormToken` is still form-only); (c) `AntiForgeryConfig.CookieName` is a
+public static property while `AntiForgeryTokenFieldName` is an **internal static field**, and no
+`AntiForgeryTokenHeaderName` exists at all. Header-based anti-forgery is ASP.NET Core-only.
+
+**Decision (deliberate fork deviation):** new package-level `ValidateJsonAntiForgeryTokenAttribute`
+(`FilterAttribute, IAuthorizationFilter`) in the editor package reads the `AntiForgeryConfig.CookieName`
+cookie and the `RequestVerificationToken` header (with `Request.Form["__RequestVerificationToken"]`
+fallback) and calls the public `AntiForgery.Validate(cookieToken, formToken)` overload, which
+bypasses the form store. All raw-JSON endpoints (SaveVersion/Restore/Preview/ToggleActive/Validate/
+Duplicate, Snippets Create/Delete) use it; the form-encoded `Create` keeps stock
+`[ValidateAntiForgeryToken]`. This is the community-standard MVC5 pattern and applies to the
+client's Windows IIS environment too — the plan's approach was impossible everywhere.
+
+## 14. mono/xsp4: MVC parameter binding drains `Request.InputStream` for JSON POSTs with bindable parameters
+
+Under mono, `FormValueProviderFactory` materializes `Request.Form` during action parameter binding
+for **any** POST with a bindable parameter (`int id`, etc.), and mono's `Request.Form` reads and
+drains the entire entity body even for `Content-Type: application/json`. The action then sees an
+empty `InputStream` and `JsonConvert.DeserializeObject<T>("")` returns null → `NullReferenceException`.
+Reproduced deterministically: an attribute-routed action with `{id:int}` + `(int id)` parameter saw
+`len=0`; the same action with no parameters saw the full 133-byte body. On Windows IIS,
+`Request.Form` does not consume the buffered input stream for JSON bodies, so this is mono-specific.
+
+**Fix (package-level, Windows-safe):** `TemplateBuilderControllerBase.OnActionExecuting` — for
+`application/json` requests, replaces the controller's `ValueProvider` with
+`RouteDataValueProvider + QueryStringValueProvider + HttpFileCollectionValueProvider`
+(no Form provider), so parameter binding never touches `Request.Form`. Route/query binding still
+works (all editor JSON endpoints take `{id:int}` etc. from route data; the form-encoded `Create`
+POST is unaffected because its content type is not JSON). `HttpRequestJsonExtensions.ReadJsonBodyAsync`
+additionally rewinds a seekable stream whose position sits at the end (defense in depth).
+
+## 15. Static-asset catch-all route hijacked `Url.Action` URL generation
+
+`TemplateBuilderEditor/{*path}` as a plain `Route` matched URL *generation* with an empty `path`,
+so `Url.Action("Index", "Templates")` produced `/TemplateBuilderEditor?action=Index&controller=Templates`
+instead of `/Templates` (the static route is registered after `MapMvcAttributeRoutes`, so it won the
+first-match walk). Request-time routing was unaffected. **Fix:** the route is now
+`TemplateBuilderStaticAssetsRoute : Route` whose `GetVirtualPath` override returns null — the
+asset route can only route requests, never generate URLs.
+
 ---

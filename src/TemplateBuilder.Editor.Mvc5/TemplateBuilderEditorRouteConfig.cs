@@ -9,8 +9,6 @@ public static class TemplateBuilderEditorRouteConfig
     {
         routes.MapMvcAttributeRoutes();
 
-        routes.Add("TemplateBuilderEditorStaticAssets", new Route(
-            "TemplateBuilderEditor/{*path}",
-            new TemplateBuilderStaticAssetsRouteHandler()));
+        routes.Add("TemplateBuilderEditorStaticAssets", new TemplateBuilderStaticAssetsRoute());
     }
 }

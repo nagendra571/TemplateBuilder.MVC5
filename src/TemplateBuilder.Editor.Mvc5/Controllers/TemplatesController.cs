@@ -110,7 +110,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/SaveVersion")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> SaveVersion(int id)
     {
         var request = await Request.ReadJsonBodyAsync<SaveVersionRequest>();
@@ -164,7 +164,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/Restore/{versionId:int}/{sourceVersionNumber:int}")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> RestoreVersion(int id, int versionId, int sourceVersionNumber)
     {
         try
@@ -196,7 +196,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/Preview")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> Preview(int id)
     {
         var request = await Request.ReadJsonBodyAsync<PreviewRequest>();
@@ -232,7 +232,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/ToggleActive")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> ToggleActive(int id)
     {
         var template = await _repository.GetByIdAsync(id);
@@ -243,7 +243,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/Validate")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> Validate(int id)
     {
         var request = await Request.ReadJsonBodyAsync<ValidateRequest>();
@@ -264,7 +264,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/{id:int}/Duplicate")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> Duplicate(int id)
     {
         var request = await Request.ReadJsonBodyAsync<DuplicateRequest>();

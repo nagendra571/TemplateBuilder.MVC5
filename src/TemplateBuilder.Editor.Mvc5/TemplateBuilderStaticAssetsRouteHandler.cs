@@ -6,6 +6,16 @@ using System.Web.Routing;
 
 namespace TemplateBuilder.Editor.Mvc5;
 
+public sealed class TemplateBuilderStaticAssetsRoute : Route
+{
+    public TemplateBuilderStaticAssetsRoute()
+        : base("TemplateBuilderEditor/{*path}", new TemplateBuilderStaticAssetsRouteHandler())
+    {
+    }
+
+    public override VirtualPathData GetVirtualPath(RequestContext requestContext, RouteValueDictionary values) => null;
+}
+
 public sealed class TemplateBuilderStaticAssetsRouteHandler : IRouteHandler, IHttpHandler
 {
     private static readonly Assembly Asm = typeof(TemplateBuilderStaticAssetsRouteHandler).Assembly;

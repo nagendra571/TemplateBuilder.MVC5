@@ -23,7 +23,7 @@ public class SnippetsController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/Api/Snippets")]
-    [HttpPost, ValidateAntiForgeryToken]
+    [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> Create()
     {
         var request = await Request.ReadJsonBodyAsync<CreateSnippetRequest>();
@@ -52,7 +52,7 @@ public class SnippetsController : TemplateBuilderControllerBase
     }
 
     [Route("Templates/Api/Snippets/{id:int}")]
-    [HttpDelete, ValidateAntiForgeryToken]
+    [HttpDelete, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> Delete(int id)
     {
         var snippet = await _snippets.GetByIdAsync(id);

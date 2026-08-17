@@ -290,10 +290,45 @@
         });
     }
 
+
+    function wireSaveVersion() {
+        var form = el('tb-template-form');
+        if (!form) return;
+        form.addEventListener('submit', function (e) {
+            if (!el('Id') || !el('Id').value) {
+                // create mode: normal form-encoded post (Create is model-bound)
+                return;
+            }
+            e.preventDefault();
+            var payload = {
+                name: el('tb-template-name') ? el('tb-template-name').value : '',
+                templateType: el('tb-template-type') ? el('tb-template-type').value : '',
+                description: el('tb-template-description') ? el('tb-template-description').value : '',
+                body: el('tb-template-body') ? el('tb-template-body').value : '',
+                changeComment: el('tb-change-comment') ? el('tb-change-comment').value : ''
+            };
+            var id = el('Id').value;
+            postJson('/Templates/' + encodeURIComponent(id) + '/SaveVersion', payload,
+                function (result) {
+                    if (result && result.versionNumber) {
+                        showMessage('Saved as v' + result.versionNumber + '.');
+                        window.location.reload();
+                    } else {
+                        showMessage('Saved.', true);
+                    }
+                },
+                function (status, body) {
+                    showMessage((body && body.message) ? body.message : 'Save failed (' + status + ').', true);
+                }
+            );
+        });
+    }
+
     function init() {
         applyTheme();
         wireThemeToggle();
         wireFindReplace();
+        wireSaveVersion();
         wireLoadColumns();
         wireRenderPreview();
         wireVersionHistory();
