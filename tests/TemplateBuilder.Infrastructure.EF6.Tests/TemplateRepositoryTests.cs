@@ -119,4 +119,34 @@ public class TemplateRepositoryTests
 
         await act.Should().ThrowAsync<System.Data.Entity.Infrastructure.DbUpdateException>();
     }
+
+    [Fact]
+    public async Task UpdateTemplateAsync_persists_sample_data()
+    {
+        using var ctx = CreateContext();
+        var repo = new TemplateRepository(ctx);
+        var template = await repo.CreateAsync(new Template { Name = "SampleDataTest", TemplateType = "Email" });
+
+        template.SampleData = "{\"RecipientName\":\"Jane Doe\"}";
+        await repo.UpdateTemplateAsync(template);
+
+        var fetched = await repo.GetByIdAsync(template.Id);
+        fetched!.SampleData.Should().Be("{\"RecipientName\":\"Jane Doe\"}");
+    }
+
+    [Fact]
+    public async Task UpdateTemplateAsync_clears_sample_data_with_null()
+    {
+        using var ctx = CreateContext();
+        var repo = new TemplateRepository(ctx);
+        var template = await repo.CreateAsync(new Template { Name = "SampleDataClear", TemplateType = "Email" });
+        template.SampleData = "{\"a\":1}";
+        await repo.UpdateTemplateAsync(template);
+
+        template.SampleData = null;
+        await repo.UpdateTemplateAsync(template);
+
+        var fetched = await repo.GetByIdAsync(template.Id);
+        fetched!.SampleData.Should().BeNull();
+    }
 }
