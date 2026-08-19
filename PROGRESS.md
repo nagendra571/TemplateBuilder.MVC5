@@ -144,3 +144,11 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
   ScribanReferenceCatalog 2 + new TemplateEngine cases); Infrastructure.EF6 13/13
   (baseline 11 + SampleData round-trip/migration tests); `node --check template-editor.js` OK;
   sample host xbuild 0 errors.
+- Packaging follow-up (post-smoke): the fresh host boot exposed that the editor's views call
+  `Html.AntiForgeryToken()` (System.Web.Helpers), which no package dependency supplied — real
+  consumers would hit a missing-assembly error on the editor pages. Fixed by adding
+  `Microsoft.AspNet.WebHelpers 3.3.0` to the Editor csproj (nuspec now declares it; latest
+  published WebHelpers line — System.Web.Helpers stays at assembly v3.0.0.0 on MVC5).
+  Repacked 1.1.0 and re-inspected the nuspec: dependency present. Sample host retains the
+  local CopyPackageAssemblies addition for System.Web.Helpers.dll (packages.config hosts do
+  not consume nuspec dependencies).
