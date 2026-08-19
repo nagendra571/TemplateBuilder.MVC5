@@ -1220,7 +1220,7 @@ Note: `Snippet` needs a `Versions` navigation property. Add it in `Snippet.cs` a
     public ICollection<SnippetVersion> Versions { get; set; } = new List<SnippetVersion>();
 ```
 
-**Migration** — create `src/TemplateBuilder.Infrastructure.EF6/Migrations/AddGovernance.cs` (mirrors the repo's plain-DbMigration pattern — no Designer file, no attributes):
+**Migration** — create `src/TemplateBuilder.Infrastructure.EF6/Migrations/AddGovernance.cs` + `.Designer.cs` + `.resx` (mirrors the repo's REAL migration pattern: every existing migration — InitialCreate, AddSampleDataToTemplates — has a Designer implementing `IMigrationMetadata` with a resx Target snapshot; EF6 discovers migrations via `IMigrationMetadata` and `MigrateDatabaseToLatestVersion`'s model-compat check needs the Target blob. A Designer-less `DbMigration` is silently skipped at runtime (`AutomaticMigrationsDisabledException`). Generate the Designer+resx with the repo's MigrationScaffolder recipe; the Up/Down code below is the plain half):
 
 ```csharp
 namespace TemplateBuilder.Infrastructure.EF6.Migrations
