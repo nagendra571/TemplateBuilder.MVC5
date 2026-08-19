@@ -564,7 +564,7 @@ public class TemplateWorkflowServiceTests
     public async Task SaveDraft_keeps_published_when_body_unchanged()
     {
         var (svc, repo, _) = Create();
-        var t = MakeTemplate(TemplateStatus.Published, null, currentVersionId: 99);
+        var t = MakeTemplate(TemplateStatus.Published, "current body", currentVersionId: 99);
         repo.GetByIdAsync(7, default).Returns(t);
 
         var result = await svc.SaveDraftAsync(7, "current body", "bob");
@@ -601,7 +601,7 @@ public class TemplateWorkflowServiceTests
         await repo.Received(1).PublishVersionAsync(7, Arg.Is<TemplateVersion>(v =>
             v.TemplateId == 7 && v.Body == "Approved body"), Arg.Any<Action<Template>?>(), default);
         await audit.Received(1).RecordAsync("Template", 7, AuditActions.Published, "bob",
-            Arg.Any<string?>(), Arg.Contains("2"), null, default);
+            Arg.Any<string?>(), Arg.Is<string>(s => s.Contains("2")), null, default);
     }
 
     [Fact]
