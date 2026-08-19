@@ -88,3 +88,59 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
   — mono's form parser chokes on nested objects. The real client always sends string values
   (form fields/textarea), so this is unreachable in production; validated the exact JS
   payloads pass.
+
+## 2026-08-19 — v1.1.0 sample-data authoring (Tasks 1-7 of the authoring-superpowers plan)
+
+- Version bump `1.0.0 -> 1.1.0` in `TemplateBuilder.Editor.Mvc5.csproj`. The published
+  `nupkg/TemplateBuilder.Editor.Mvc5.1.0.0.nupkg` is untouched (not modified, not re-packed,
+  nothing pushed — publish requires explicit confirmation).
+- `dotnet pack -c Release -o ./nupkg` -> `nupkg/TemplateBuilder.Editor.Mvc5.1.1.0.nupkg`
+  (778152 B) alongside the 1.0.0 artifact. Extracted and inspected: file set identical to
+  1.0.0 (only the psmdcp metadata guid differs) — `lib/net48/` all 4 DLLs,
+  `tools/install.ps1`, root `README.md`, NO `.cshtml` anywhere. New types verified present in
+  the packaged Application.dll via mono reflection (monodis absent from this box):
+  `ISampleDataGenerator`, `SampleDataGenerator`, `ScribanReferenceEntry`,
+  `ScribanReferenceCatalog`.
+- Sample host upgraded from the package: `mono nuget.exe install TemplateBuilder.Editor.Mvc5
+  -Version 1.1.0 -Source ./nupkg -ConfigFile /tmp/opencode/nuget-cfg.txt` into
+  `samples/TemplateBuilder.SampleMvc5Host/packages/`; old `TemplateBuilder.Editor.Mvc5.1.0.0`
+  package dir deleted; 4 HintPaths bumped to `1.1.0`; xbuild 0 errors (4 pre-existing
+  CS1701/1702 warnings). **Environment gap found during smoke:** the host bin lacked
+  `System.Web.Helpers.dll` (the editor's views call `Html.AntiForgeryToken()`; the previous
+  session's server must have resolved it from an editor-bin `MONO_PATH` — unreproducible).
+  Real NuGet installs of the WebPages 3.3.0 closure supply it, so one line was added to the
+  host's `CopyPackageAssemblies` target (the only deviation from the plan's "4 HintPaths
+  only"); fresh `xbuild` then reproduces a working bin (43 dlls incl. System.Web.Helpers).
+- DB migration: `Templates.SampleData` column present before first request (baseline from the
+  1.0.0 boot) and still present after first 1.1.0 boot — `AddSampleDataToTemplates`
+  (202608182306535) applies via the existing `MigrateDatabaseToLatestVersion` initializer.
+- xsp4 regression smoke (fresh server on `http://localhost:8081`, cookie jar + matching
+  `__RequestVerificationToken` from the same page fetch): `/` 200; `/Templates` 200 (stats
+  sidebar + type/status badges + `duplicate-modal`); `/Templates/Create` 200 (`btn-create-submit`,
+  no version UI); form POST Create (token + cookie) -> 302 -> template id=1; `/Templates/1/Edit`
+  200 (3-panel grid, SunEditor, `palette-search`, `ref-panel`); assets 200 with correct
+  content-types (`application/javascript` / `text/css`); SaveVersion JSON ->
+  `{"versionId":2,"versionNumber":2}`; Versions partial 200 (1 card, is-current);
+  VersionBody -> `{"body":"Hi {{model.FirstName}} v1"}`; Validate 400 (empty body) / 200
+  `{"valid":false,"message":"...nope_filter was not found"}` (broken template) / 200
+  `{"valid":true}`; ToggleActive 200; Duplicate -> `{"id":2}`; Restore -> `{"versionId":4,
+  "versionNumber":3}` (route needs the token header — bare POST 500s on antiforgery);
+  Snippets GET 200 / POST -> `{"id":2,...}` / DELETE 204; `/_setup` 3x PASS.
+- New-feature smoke (same token/cookie): `POST /Templates/Api/SampleData/Generate`
+  `{"viewName":"v_TestContacts"}` -> 200 `{"sampleData":{"Id":42,"FirstName":"Jane Doe",
+  "Email":"jane.doe@agency.gov"}}` (view was created in the fresh DB first — the v1.0.0 probe
+  pattern); `{"templateBody":"Hi {{model.RecipientName}} — {{model.Amount}}"}` -> 200
+  `{"sampleData":{"RecipientName":"Jane Doe","Amount":1250.00}}`; create-mode (templateBody
+  only) -> 200; `PUT /Templates/1/SampleData` `{"sampleData":"{\"a\":1}"}` -> 200
+  `{"saved":true}`; Edit reload contains `savedSampleData = "{\"a\":1}"`; Edit page HTML
+  contains `palette-search`, `btn-ref-open`, `ref-groups` (15 `tb-ref-group` sections, 15
+  `tb-ref-item` with code/label/output spans); JS 200 and contains `SampleData/Generate`,
+  `btn-ref-open` open-handler, `palette-search` input handler, draft autosave (localStorage
+  `tb-draft-*`); CSS 200 and contains `.tb-ref-panel`; Preview POST (body + modelJson) ->
+  200 `{"html":"Hi Alice"}` (auto-fill/preview reuses savedSampleData per JS);
+  draft save/restore and auto-fill code unchanged and present.
+- Final gates: `dotnet build TemplateBuilder.Mvc5.sln` 0 errors (9 pre-existing warnings);
+  Domain 16/16; Application 50/50 (baseline 22 + Task 1-2 suite incl. SampleDataGenerator 9 +
+  ScribanReferenceCatalog 2 + new TemplateEngine cases); Infrastructure.EF6 13/13
+  (baseline 11 + SampleData round-trip/migration tests); `node --check template-editor.js` OK;
+  sample host xbuild 0 errors.
