@@ -93,6 +93,51 @@ public class TemplateVersionTests
     }
 }
 
+public class TemplateWorkflowTests
+{
+    [Fact]
+    public void Template_defaults_to_Draft_status()
+    {
+        var t = new Template { Name = "X", TemplateType = "Email" };
+        t.Status.Should().Be(TemplateStatus.Draft);
+    }
+}
+
+public class AuditLogTests
+{
+    [Fact]
+    public void AuditLog_defaults_are_nullable()
+    {
+        var a = new AuditLog { EntityType = "Template", EntityId = 1, Action = "created", Actor = "user" };
+        a.OccurredAt.Should().Be(default);
+        a.BeforeState.Should().BeNull();
+    }
+}
+
+public class SnippetVersionTests
+{
+    [Fact]
+    public void SnippetVersion_defaults_to_empty_body()
+    {
+        var v = new SnippetVersion { SnippetId = 1, VersionNumber = 1 };
+        v.Body.Should().BeEmpty();
+    }
+}
+
+public class AuditActionsTests
+{
+    [Fact]
+    public void AuditActions_contains_all_expected_values()
+    {
+        AuditActions.Published.Should().Be("published");
+        AuditActions.Submitted.Should().Be("submitted");
+        AuditActions.Approved.Should().Be("approved");
+        AuditActions.Rejected.Should().Be("rejected");
+        AuditActions.ReviewCancelled.Should().Be("review_cancelled");
+        AuditActions.SnippetRestored.Should().Be("snippet_restored");
+    }
+}
+
 public class SnippetTests
 {
     [Fact]

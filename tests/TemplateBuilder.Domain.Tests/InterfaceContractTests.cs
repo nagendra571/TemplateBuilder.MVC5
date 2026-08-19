@@ -35,7 +35,19 @@ public class InterfaceContractTests
     [Fact]
     public void ISnippetRepository_has_exactly_the_plan_surface()
     {
-        var expected = new[] { "GetAllAsync", "GetByIdAsync", "CreateAsync", "DeleteAsync" };
+        var expected = new[]
+        {
+            "GetAllAsync",
+            "GetByIdAsync",
+            "CreateAsync",
+            "DeleteAsync",
+            "UpdateWithVersionAsync",
+            "GetVersionHistoryAsync",
+            "GetVersionAsync",
+            "RestoreVersionAsync",
+            "RecordUsageAsync",
+            "GetUsageStatsAsync"
+        };
 
         MethodNames(typeof(ISnippetRepository)).Should().BeEquivalentTo(expected);
     }
