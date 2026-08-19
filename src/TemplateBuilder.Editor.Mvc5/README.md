@@ -1,79 +1,344 @@
 # TemplateBuilder.Editor.Mvc5
 
-Template management UI for ASP.NET MVC 5 / .NET Framework 4.8 applications: create and edit
-templates, version history, restore, live preview, reusable snippets, and configurable
-authorization. Templates are rendered with Scriban and sanitized before rendering.
+**Current version: 1.1.0**
 
-## Install
+Embed a full Scriban-powered HTML template management UI into any ASP.NET MVC 5 application running on .NET Framework 4.8. Install the package, register a Unity container, wire up two routes — and your users can create, edit, version, compare, preview, and restore templates with reusable snippets, all wrapped in your own site layout.
 
-```
+The same product line as [`TemplateBuilder.Editor`](https://www.nuget.org/packages/TemplateBuilder.Editor) (ASP.NET Core / .NET 8+), rebuilt for the MVC 5 / EF6 / Unity stack.
+
+---
+
+## Screenshots
+
+| Template list | 3-panel editor (light) |
+|---|---|
+| ![Template list](docs/screenshots/templates-list.png) | ![Editor light theme](docs/screenshots/editor-light.png) |
+
+| Live preview | Editor (dark theme) |
+|---|---|
+| ![Live preview modal](docs/screenshots/preview-modal-rendered.png) | ![Editor dark theme](docs/screenshots/editor-dark.png) |
+
+---
+
+## Requirements
+
+- .NET Framework 4.8
+- ASP.NET MVC 5.x (`System.Web.Mvc` 5.3.0)
+- Unity 5.x + `Unity.Mvc5` 1.4.x
+- Entity Framework 6.x
+- SQL Server (any edition — schema is created for you)
+- Newtonsoft.Json 13.x, RazorGenerator.Mvc 2.4.x (pulled in automatically)
+
+> **Note:** the editor ships with precompiled Razor views and its own bundled JavaScript/CSS — no `.cshtml` files are ever copied into your project.
+
+---
+
+## Quick Start
+
+### 1. Install
+
+Package Manager Console:
+
+```powershell
 Install-Package TemplateBuilder.Editor.Mvc5
 ```
 
-Requires ASP.NET MVC 5.x, Unity 5.x, Entity Framework 6.x and .NET Framework 4.8.
+> The package ships a `tools/install.ps1` that lists the recommended assembly binding redirects (Newtonsoft.Json 13, EntityFramework 6.5.1, System.Text.Json 10) for `packages.config`-style projects.
 
-## Setup
+### 2. Add a connection string
 
-In `UnityConfig` (or wherever you register your Unity container):
+```xml
+<!-- Web.config -->
+<connectionStrings>
+  <add name="TemplateDb"
+       connectionString="Server=.;Database=TemplateBuilder;Trusted_Connection=True;TrustServerCertificate=True;"
+       providerName="System.Data.SqlClient" />
+</connectionStrings>
+```
+
+### 3. Register in your Unity bootstrapper
+
+```csharp
+using System.Web.Mvc;
+using TemplateBuilder.Editor.Mvc5;
+using Unity;
+using Unity.Mvc5;
+
+public static class UnityConfig
+{
+    public static void RegisterComponents()
+    {
+        var container = new UnityContainer();
+
+        container.RegisterTemplateBuilderEditor(options =>
+        {
+            options.ConnectionString =
+                System.Configuration.ConfigurationManager.ConnectionStrings["TemplateDb"].ConnectionString;
+        });
+
+        DependencyResolver.SetResolver(new UnityDependencyResolver(container));
+    }
+}
+```
+
+Call `UnityConfig.RegisterComponents()` from `Application_Start` (or wherever your app boots).
+
+### 4. Wire up routing
+
+In `RouteConfig.RegisterRoutes`, **before** your conventional catch-all route:
+
+```csharp
+using TemplateBuilder.Editor.Mvc5;
+
+public static void RegisterRoutes(RouteCollection routes)
+{
+    TemplateBuilderEditorRouteConfig.RegisterRoutes(routes); // attribute routes + /TemplateBuilderEditor assets
+
+    routes.MapRoute(
+        name: "Default",
+        url: "{controller}/{action}/{id}",
+        defaults: new { controller = "Home", action = "Index", id = UrlParameter.Optional });
+}
+```
+
+### 5. Register the precompiled view engine
+
+The editor's views are compiled into the package assembly (RazorGenerator). Add them to the view engine list in `Application_Start`:
+
+```csharp
+ViewEngines.Engines.Clear();
+ViewEngines.Engines.Add(new PrecompiledMvcEngine(typeof(TemplateBuilder.Editor.Mvc5.UnityContainerExtensions).Assembly));
+ViewEngines.Engines.Add(new RazorViewEngine()); // your own views
+```
+
+### 6. Link the editor assets
+
+The editor's CSS/JS are served from `/TemplateBuilderEditor/...` and rendered inside a `#tb-editor-host` container, so they cannot collide with your page's Bootstrap 3 (or other) styles:
+
+```html
+<head>
+    <link href="/TemplateBuilderEditor/css/suneditor.min.css" rel="stylesheet" />
+    <link href="/TemplateBuilderEditor/css/template-editor.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- add a link to the editor somewhere in your nav: -->
+    <a href="/Templates">Templates</a>
+
+    @RenderBody()
+
+    <script src="/TemplateBuilderEditor/js/suneditor.min.js"></script>
+    <script src="/TemplateBuilderEditor/js/template-editor.js"></script>
+</body>
+```
+
+### 7. Run
+
+EF6 migrations apply automatically on first startup — the database and schema are created for you. Navigate to `/Templates`.
+
+---
+
+## Access Control
+
+By default the editor is **open to all users** — no authentication is required. To restrict access, add the editor's global authorization filter and configure `options.Authorization`:
+
+```csharp
+// FilterConfig.RegisterGlobalFilters — protects every editor route
+filters.Add(new TemplateBuilderAuthorizationFilter());
+```
+
+#### Anonymous (default — no change required)
 
 ```csharp
 container.RegisterTemplateBuilderEditor(options =>
 {
-    options.ConnectionString = ConfigurationManager.ConnectionStrings["TemplateDb"].ConnectionString;
-    options.Authorization.Mode = TemplateBuilderAuthorizationMode.AuthenticatedUser; // or Anonymous/ConfiguredRoles
+    options.ConnectionString = ...;
+    // options.Authorization.Mode defaults to Anonymous
 });
 ```
 
-The editor renders inside a `#tb-editor-host` container so its CSS cannot collide with your
-host page's Bootstrap 3 (or other) styles.
+#### Authenticated users only
 
-## Wiring
-
-1. **Routing** — in `RegisterRoutes` (or `Application_Start`):
+Any signed-in user can access the editor.
 
 ```csharp
-TemplateBuilderEditorRouteConfig.RegisterRoutes(RouteTable.Routes);
+using TemplateBuilder.Editor.Mvc5.Authorization;
+
+options.Authorization.Mode = TemplateBuilderAuthorizationMode.Authenticated;
 ```
 
-This maps the MVC attribute routes (`/Templates`, `/Templates/{id}/Edit`, `/Templates/_setup`,
-`/Templates/Api/Snippets`, ...) and the `/TemplateBuilderEditor/{*path}` static-asset route
-(`css/template-editor.css`, `js/template-editor.js`).
+#### Role-based access
 
-2. **Assets** — add these to the page or layout that hosts the editor (mirrors the ASP.NET Core
-   `/_content/...` convention):
+A user in **any** of the listed roles is granted access (OR logic).
+
+```csharp
+using TemplateBuilder.Editor.Mvc5.Authorization;
+
+options.Authorization.Mode = TemplateBuilderAuthorizationMode.Role;
+options.Authorization.RoleNames = new[] { "Admin", "Supervisor" };
+```
+
+#### Custom authorization (escape hatch)
+
+For claims-based or composite rules, register your own `IAuthorizationFilter` under a name and point the editor at it:
+
+```csharp
+// 1. Register your filter during startup
+TemplateBuilderAuthorizationPolicyRegistry.Register(
+    "TemplateEditorAccess", new MyCustomAuthorizationFilter());
+
+// 2. Point the editor at it
+options.Authorization.PolicyName = "TemplateEditorAccess";
+```
+
+#### What is protected
+
+The filter applies to every editor controller — the full route surface (`/Templates/*` including Edit, Preview, SaveVersion, Versions, Restore, Duplicate, Validate, ToggleActive, the Snippets API, and `/_setup`).
+
+---
+
+## Setup Diagnostic Page
+
+After installation, navigate to **`/Templates/_setup`** (requires `<compilation debug="true" />`; returns 404 otherwise) to verify every integration requirement at once:
+
+| Check | What it detects |
+|---|---|
+| Database connection | SQL Server reachable with the configured connection string |
+| `MapMvcAttributeRoutes()` registered | Attribute-routed endpoints (Edit, Preview, SaveVersion, Versions) are reachable |
+| Static assets serving | `/TemplateBuilderEditor/...` is being served |
+
+Every failing check shows a one-line fix.
+
+---
+
+## Features
+
+| Feature | Route |
+|---|---|
+| Template list | `GET /Templates` |
+| Create template | `GET/POST /Templates/Create` |
+| Edit template | `GET /Templates/{id}/Edit` |
+| Save version | `POST /Templates/{id}/SaveVersion` |
+| Version history | `GET /Templates/{id}/Versions` |
+| Version body (for compare) | `GET /Templates/{id}/Versions/{versionId}/Body` |
+| Restore version | `POST /Templates/{id}/Restore/{versionId}/{sourceVersionNumber}` |
+| Live preview | `POST /Templates/{id}/Preview` |
+| Duplicate | `POST /Templates/{id}/Duplicate` |
+| Validate syntax | `POST /Templates/{id}/Validate` |
+| Toggle active | `POST /Templates/{id}/ToggleActive` |
+| List snippets | `GET /Templates/Api/Snippets` |
+| Create snippet | `POST /Templates/Api/Snippets` |
+| Delete snippet | `DELETE /Templates/Api/Snippets/{id}` |
+| Setup check | `GET /Templates/_setup` *(debug only)* |
+
+---
+
+## Theming
+
+The editor ships with a **light theme** by default. A **☀ Light / 🌙 Dark** toggle button appears in the CANVAS panel heading and persists your preference in `localStorage`.
+
+The editor's styles are fully scoped to `#tb-editor-host` using CSS custom properties — they do not affect the rest of your application. The editing canvas is always white (document-like) regardless of the selected theme.
+
+---
+
+## Template Syntax
+
+Templates use [Scriban](https://github.com/scriban/scriban) — access model properties via `model.*`:
 
 ```html
-<link href="/TemplateBuilderEditor/css/template-editor.css" rel="stylesheet" />
-<script src="/TemplateBuilderEditor/js/template-editor.js"></script>
+<p>Hello <strong>{{ model.FirstName }}</strong>,</p>
+
+{{ for item in model.Items }}
+  <p>{{ item.Name }} — {{ item.Price }}</p>
+{{ end }}
+
+{{ if model.IsPremium }}
+  <p>Thank you for being a premium member.</p>
+{{ end }}
 ```
 
-3. **Authorization** — register `TemplateBuilderAuthorizationFilter` as a global filter if you
-   want the editor's policy applied to all requests:
+Live preview and version-comparison output is passed through an HTML sanitizer (HtmlSanitizer), so `model.*` values cannot inject script or arbitrary markup into your rendered emails/documents. Sanitization happens in the editor's Preview endpoints — when you render templates in your own code, apply `IHtmlSanitizerService.Sanitize` to the output (as the preview endpoint does).
+
+---
+
+## Render Templates in Code
+
+`TemplateBuilder.Editor.Mvc5` includes the rendering engine. Resolve `ITemplateEngine` from Unity anywhere:
 
 ```csharp
-filters.Add(new TemplateBuilderAuthorizationFilter());
+using TemplateBuilder.Domain.Interfaces;
+
+public class WelcomeEmailBuilder
+{
+    private readonly ITemplateEngine _engine;
+
+    public WelcomeEmailBuilder(ITemplateEngine engine) => _engine = engine;
+
+    public Task<string> BuildAsync(string firstName) =>
+        _engine.RenderByNameAsync("Welcome Email", new { FirstName = firstName });
+}
 ```
 
-4. **Async actions** — the editor's controllers use `async`/`await`. IIS + .NET Framework flow
-   `HttpContext` through async continuations natively, so no extra wiring is needed on Windows.
+Available methods: `RenderAsync(templateId, model)`, `RenderByNameAsync(name, model)`, and `RenderBodyAsync(body, model)` — all supporting both `model.*` and top-level access.
 
-5. **Connection string** — the editor's EF6 context migrates the schema on first access. Point
-   `options.ConnectionString` at a database you own (the sample host uses a
-   `TemplateBuilderDbContext` connection string for the migration initializer's internal context).
+---
 
-## Diagnostics
+## Database
 
-`/Templates/_setup` runs a setup check that reports each requirement (database reachability,
-schema, view discovery, static assets) with PASS/FAIL and a fix for every failure.
+`RegisterTemplateBuilderEditor()` runs EF6 `MigrateDatabaseToLatestVersion` on first access — migrations are bundled with the package. No manual migration steps are required.
+
+---
+
+## Static Assets
+
+CSS and JS are served automatically from:
+
+```
+/TemplateBuilderEditor/css/suneditor.min.css
+/TemplateBuilderEditor/css/template-editor.css
+/TemplateBuilderEditor/js/suneditor.min.js
+/TemplateBuilderEditor/js/template-editor.js
+```
+
+The static-asset route is registered by `TemplateBuilderEditorRouteConfig.RegisterRoutes()` and never intercepts URL generation. After upgrading the package, do a hard refresh (Ctrl+Shift+R) to clear cached assets.
+
+---
+
+## JSON Endpoints & Anti-Forgery
+
+MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints (`Create`, `SaveVersion`, `Preview`, `Restore`, `Validate`, `Duplicate`, `ToggleActive`, `SampleData`, Snippets) are protected by the package's `ValidateJsonAntiForgeryTokenAttribute`. The bundled editor JavaScript sends the `RequestVerificationToken` header automatically — no extra wiring required on your side. Create uses a JSON body (not a form POST), so raw HTML template bodies pass through MVC 5 request validation cleanly on every host.
+
+---
 
 ## What's New
 
-### v1.0.0
+#### v1.1.0
 
-- Initial release. MVC 5 port of `TemplateBuilder.Editor` (ASP.NET Core), including:
-  - Template create/edit with Scriban body, find & replace, live preview with model JSON
-  - Version history, compare/restore, duplicate, toggle active, server-side validation
-  - Reusable snippets
-  - SQL view discovery for template preview data
-  - Configurable authorization (anonymous / authenticated user / configured roles)
-  - `#tb-editor-host` CSS scoping against host-page style collisions
+- **`{{ model.X }}` template syntax** — templates can reference model fields through the `model` prefix (`{{ model.RecipientName }}`), matching what the field palette inserts; both `model.*` and top-level access render.
+- **Create accepts HTML template bodies** — Create is now a JSON endpoint (like Save Version), so rich HTML bodies pass request validation cleanly on Windows IIS and mono/xsp4 hosts.
+- **Server-side sample-data generation** — Generate sample JSON from the selected SQL view, from `{{ model.X }}` tokens in the template, or both; save it with the template for one-click preview.
+- **Field palette search, used-field markers, and model badges** — find fields fast and see which are already referenced in the canvas.
+- **Scriban syntax reference panel** — a searchable quick-reference for Scriban statements, `model` access, and expected output.
+- **`mailto:` links preserved in preview** — the sanitizer now allows the `mailto` scheme, so email links in your templates survive preview/compare rendering.
+- **Real server error messages in the UI** — duplicate-name and validation errors are shown verbatim instead of a generic failure message.
+- **Antiforgery dependency fix** — `Microsoft.AspNet.WebHelpers` is now declared explicitly so `[ValidateJsonAntiForgeryToken]` works in packages.config solutions.
+
+#### v1.0.0
+
+- **Initial release** — full template management UI for ASP.NET MVC 5 / .NET Framework 4.8: create/edit, version history, restore, side-by-side compare, live preview with auto-generated sample JSON, reusable snippets, find & replace, auto-save drafts, dark/light themes.
+- **Feature parity** with the ASP.NET Core `TemplateBuilder.Editor` UI, ported to a `packages.config`-friendly, non-SDK-style hosting environment.
+- **Precompiled Razor views** via RazorGenerator — the package ships zero `.cshtml` files.
+- **CSS isolation** — all editor styles scoped to `#tb-editor-host`, safe alongside Bootstrap 3.3.7 / jQuery / IgniteUI host pages.
+- **Header-based anti-forgery for JSON endpoints** (`ValidateJsonAntiForgeryTokenAttribute`) — the community-standard MVC 5 pattern, working on Windows IIS and mono.
+- **Scriban rendering with `model.*` syntax** and output sanitization via HtmlSanitizer.
+- **EF6 Code-First migrations** applied automatically on startup.
+- **`tools/install.ps1`** ships binding-redirect guidance for packages.config consumers.
+
+---
+
+## Updating
+
+```powershell
+Update-Package TemplateBuilder.Editor.Mvc5
+```
+
+EF migrations are bundled — schema changes apply automatically on next startup. Hard-refresh (Ctrl+Shift+R) to pick up the new CSS/JS assets.

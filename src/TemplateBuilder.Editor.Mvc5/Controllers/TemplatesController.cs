@@ -55,14 +55,12 @@ public class TemplatesController : TemplateBuilderControllerBase
         return View("Edit", new TemplateEditorViewModel { AvailableViews = views.ToList() });
     }
 
-    [HttpPost, ValidateAntiForgeryToken]
-    public async Task<ActionResult> Create(TemplateEditorViewModel model)
+    [HttpPost, ValidateJsonAntiForgeryToken, ActionName("Create")]
+    public async Task<ActionResult> CreateTemplateJson()
     {
-        if (!ModelState.IsValid)
-        {
-            model.AvailableViews = (await _viewDiscovery.GetViewNamesAsync()).ToList();
-            return View("Edit", model);
-        }
+        var model = await Request.ReadJsonBodyAsync<TemplateEditorViewModel>();
+        if (string.IsNullOrWhiteSpace(model.Name))
+            return JsonError(400, new ErrorResult("VALIDATION_ERROR", "Template name is required."));
         try
         {
             var template = await _repository.CreateAsync(new Template
@@ -83,7 +81,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 });
             }
 
-            return RedirectToAction(nameof(Edit), new { id = template.Id });
+            return JsonOk(new { templateId = template.Id });
         }
         catch (DbUpdateException)
         {

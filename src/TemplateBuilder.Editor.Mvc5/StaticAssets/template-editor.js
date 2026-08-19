@@ -1,5 +1,10 @@
 const _csrf = document.querySelector('input[name=__RequestVerificationToken]')?.value ?? '';
 
+function errMessage(err, fallback) {
+    if (!err) return fallback;
+    return err.message ?? err.Message ?? fallback;
+}
+
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const _host = document.getElementById('tb-editor-host');
 const _theme = localStorage.getItem('tb-theme') || 'light';
@@ -612,6 +617,53 @@ function refreshUsedMarks() {
     }, 1500);
 }
 
+// ── Create template (JSON, mirrors saveVersion — form POSTs cannot carry raw
+//    HTML through MVC5 request validation) ─────────────────────────────────────
+
+async function createTemplate() {
+    const btn = document.getElementById('btn-create-submit');
+    const errorEl = document.getElementById('save-error');
+    errorEl.style.display = 'none';
+    btn.disabled = true;
+    if (!_editor) {
+        errorEl.textContent = 'Editor is still loading — please wait a moment.';
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        return;
+    }
+    const body = _editor.getContents();
+    try {
+        const res = await fetch('/Templates/Create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': _csrf
+            },
+            body: JSON.stringify({
+                name: document.getElementById('prop-name').value,
+                templateType: document.getElementById('prop-type').value,
+                description: document.getElementById('prop-desc').value,
+                body
+            })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            window.location.href = `/Templates/${data.templateId}/Edit`;
+        } else {
+            const err = await res.json().catch(() => null);
+            errorEl.textContent = errMessage(err, 'Failed to create template.');
+            errorEl.style.display = 'block';
+        }
+    } catch {
+        errorEl.textContent = 'Network error — please try again.';
+        errorEl.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+document.getElementById('btn-create-submit')?.addEventListener('click', createTemplate);
+
 // ── Save version ──────────────────────────────────────────────────────────────
 
 async function saveVersion() {
@@ -650,7 +702,7 @@ async function saveVersion() {
             showToast('Version saved');
         } else {
             const err = await res.json().catch(() => null);
-            errorEl.textContent = err?.message ?? 'Failed to save version.';
+            errorEl.textContent = errMessage(err, 'Failed to save version.');
             errorEl.style.display = 'block';
         }
     } catch {
@@ -720,7 +772,7 @@ async function restoreVersion(btn, versionId, sourceVersionNumber) {
             window.location.reload();
         } else {
             const err = await res.json().catch(() => null);
-            restoreErrorEl.textContent = err?.message ?? 'Failed to restore version.';
+            restoreErrorEl.textContent = errMessage(err, 'Failed to restore version.');
             restoreErrorEl.style.display = 'block';
             btn.disabled = false;
         }
@@ -791,7 +843,7 @@ async function _renderComparePanel(side, body, versionId) {
         });
         if (!previewRes.ok) {
             const err = await previewRes.json().catch(() => null);
-            loadingEl.textContent = `Preview failed: ${err?.message ?? previewRes.status}`;
+            loadingEl.textContent = `Preview failed: ${errMessage(err, previewRes.status)}`;
             return;
         }
         iframeEl.srcdoc = (await previewRes.json()).html;
@@ -815,7 +867,7 @@ async function restoreFromCompare(btn, versionId, sourceVersionNumber) {
             window.location.reload();
         } else {
             const err = await res.json().catch(() => null);
-            errEl.textContent = err?.message ?? 'Failed to restore version.';
+            errEl.textContent = errMessage(err, 'Failed to restore version.');
             errEl.style.display = 'block';
             btn.disabled = false;
         }
