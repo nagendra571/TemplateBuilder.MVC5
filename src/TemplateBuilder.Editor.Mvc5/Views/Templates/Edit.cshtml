@@ -1,4 +1,5 @@
 @using TemplateBuilder.Editor.Mvc5.Models
+@using TemplateBuilder.Application.Services
 @model TemplateEditorViewModel
 
 <div id="tb-editor-host">
@@ -14,7 +15,9 @@
 
             <!-- LEFT: Field Palette -->
             <div class="tb-panel-left">
-                <div class="tb-panel-heading" id="palette-heading"><span class="tb-heading-icon">&#8854;</span> FIELD PALETTE</div>
+                <div class="tb-panel-heading" id="palette-heading"><span class="tb-heading-icon">&#8854;</span> FIELD PALETTE
+                    <button type="button" id="btn-ref-open" class="tb-ref-open-btn" title="Scriban syntax reference">?</button>
+                </div>
                 <div class="tb-view-selector-row">
                     <label for="view-selector">SQL View</label>
                     <select id="view-selector">
@@ -24,6 +27,9 @@
                             <option value="@view">@view</option>
                         }
                     </select>
+                </div>
+                <div class="tb-palette-search-row">
+                    <input type="search" id="palette-search" class="tb-palette-search" placeholder="Search fields&#8230;" autocomplete="off" aria-label="Search fields">
                 </div>
                 <div id="field-palette" aria-live="polite">
                     <div class="tb-palette-msg">Select a view to see fields</div>
@@ -202,10 +208,23 @@
                 <div class="tb-form-row">
                     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
                         <label for="preview-json" style="margin:0;">Sample Data (JSON)</label>
-                        <button type="button" id="btn-gen-sample" class="btn btn-ghost btn-sm"
-                                title="Auto-fill sample values from {{ model.X }} placeholders in the template">
-                            &#9889; Auto-fill from template
-                        </button>
+                        <div class="tb-preview-actions">
+                            <button type="button" id="btn-gen-save" class="btn btn-ghost btn-sm"
+                                    title="Save this sample data to the template" style="display:none;">&#128190; Save to template</button>
+                            <div class="tb-dropdown">
+                                <button type="button" id="btn-gen-menu" class="btn btn-ghost btn-sm"
+                                        aria-haspopup="menu" aria-expanded="false">&#9889; Generate &#9662;</button>
+                                <div class="tb-dropdown-menu" id="gen-menu" role="menu" hidden>
+                                    <button type="button" class="tb-gen-option" data-gen="view" role="menuitem">From SQL view</button>
+                                    <button type="button" class="tb-gen-option" data-gen="tokens" role="menuitem">From template tokens</button>
+                                    <button type="button" class="tb-gen-option" data-gen="both" role="menuitem">Both</button>
+                                </div>
+                            </div>
+                            <button type="button" id="btn-gen-sample" class="btn btn-ghost btn-sm"
+                                    title="Auto-fill sample values from {{ model.X }} placeholders in the template">
+                                &#9889; Auto-fill from template
+                            </button>
+                        </div>
                     </div>
                     <textarea id="preview-json" class="tb-code-textarea" rows="8"
                               placeholder='{ "FieldName": "value" }'>{}</textarea>
@@ -356,9 +375,37 @@
         <div id="sc-groups" class="tb-sc-groups"></div>
     </div>
 
+    <!-- Scriban Reference floating panel (non-blocking — no overlay) -->
+    <div id="ref-panel" class="tb-ref-panel" hidden role="dialog" aria-label="Scriban Reference">
+        <div class="tb-ref-header">
+            <span class="tb-ref-title">Scriban Reference</span>
+            <button type="button" id="btn-ref-close" class="tb-ref-close" aria-label="Close">&#x2715;</button>
+        </div>
+        <div class="tb-ref-search-row">
+            <input type="search" id="ref-search" class="tb-ref-search" placeholder="Search&#8230;" autocomplete="off">
+        </div>
+        <div id="ref-groups" class="tb-ref-groups">
+            @foreach (var group in ScribanReferenceCatalog.Entries.GroupBy(e => e.Group))
+            {
+                <div class="tb-ref-group" data-group="@group.Key">
+                    <div class="tb-ref-group-label">@group.Key</div>
+                    @foreach (var entry in group)
+                    {
+                        <button type="button" class="tb-ref-item" data-code="@entry.Code" data-label="@entry.Label"
+                                title="@entry.Label">
+                            <span class="tb-ref-item-label">@entry.Label</span>
+                            <code class="tb-ref-item-code">@entry.Code</code>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
 </div>
 
 <script>
     const templateId = @(Model.Id ?? 0);
     const currentVersionNumber = @Model.CurrentVersionNumber;
+    let savedSampleData = @Html.Raw(Json.Encode(Model.SampleData));
 </script>
