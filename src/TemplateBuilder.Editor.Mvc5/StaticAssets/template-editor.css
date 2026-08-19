@@ -1414,3 +1414,78 @@
 
 /* Visually hidden label utility (used by the list page) */
 #tb-editor-host .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ── 32. v1.1: Palette search, used markers, preview toolbar, Scriban reference ── */
+
+/* Palette search row (between view selector and field palette — 12px inset matches #field-palette) */
+#tb-editor-host .tb-palette-search-row { padding: 0 12px 8px; }
+#tb-editor-host .tb-palette-search {
+    width: 100%; box-sizing: border-box; padding: 6px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-size: 13px;
+}
+
+/* Reference open button — palette heading */
+#tb-editor-host .tb-ref-open-btn {
+    margin-left: auto; width: 22px; height: 22px; border-radius: 50%;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-muted); cursor: pointer; font-weight: 700; line-height: 1;
+}
+#tb-editor-host .tb-ref-open-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Palette used-field markers */
+#tb-editor-host .palette-field--used .palette-field-label { color: var(--text-muted); }
+#tb-editor-host .palette-field--used .palette-field-label::after { content: " ✓"; color: var(--accent); }
+#tb-editor-host .palette-field-used-mark { display: none; }
+#tb-editor-host .palette-field-type { font-size: 11px; opacity: .75; }
+
+/* Preview modal — sample-data toolbar */
+#tb-editor-host .tb-preview-actions { display: flex; align-items: center; gap: 6px; }
+
+/* Sample-data Generate dropdown */
+#tb-editor-host .tb-dropdown { position: relative; }
+#tb-editor-host .tb-dropdown-menu {
+    position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
+    min-width: 180px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 4px;
+}
+#tb-editor-host .tb-dropdown-menu[hidden] { display: none; }
+#tb-editor-host .tb-dropdown-menu button {
+    display: block; width: 100%; text-align: left; padding: 8px 10px;
+    border: 0; background: transparent; color: var(--text); cursor: pointer;
+    border-radius: var(--radius); font-size: 13px; font-family: inherit;
+}
+#tb-editor-host .tb-dropdown-menu button:hover { background: var(--surface2); }
+
+/* Scriban Reference floating panel (non-blocking — no overlay) */
+#tb-editor-host .tb-ref-panel {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(560px, 92vw); max-height: 70vh; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-modal); z-index: 500; overflow: hidden;
+    color: var(--text); font-family: inherit;
+}
+#tb-editor-host .tb-ref-panel[hidden] { display: none; }
+#tb-editor-host .tb-ref-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+#tb-editor-host .tb-ref-title { font-weight: 700; font-size: 14px; letter-spacing: .02em; }
+#tb-editor-host .tb-ref-close { border: 0; background: transparent; color: var(--text-muted); font-size: 16px; cursor: pointer; }
+#tb-editor-host .tb-ref-close:hover { color: var(--text); }
+#tb-editor-host .tb-ref-search-row { padding: 10px 16px; }
+#tb-editor-host .tb-ref-search {
+    width: 100%; box-sizing: border-box; padding: 7px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-size: 13px;
+}
+#tb-editor-host .tb-ref-groups { overflow-y: auto; padding: 0 16px 16px; }
+#tb-editor-host .tb-ref-group { margin-bottom: 14px; }
+#tb-editor-host .tb-ref-group-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+#tb-editor-host .tb-ref-item {
+    display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+    padding: 8px 10px; margin-bottom: 6px; border: 1px solid var(--border);
+    border-radius: var(--radius-md); background: var(--bg); color: var(--text); cursor: pointer;
+    font-family: inherit;
+}
+#tb-editor-host .tb-ref-item:hover { border-color: var(--accent); }
+#tb-editor-host .tb-ref-item-label { font-size: 13px; font-weight: 600; }
+#tb-editor-host .tb-ref-item-code { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
+#tb-editor-host .tb-ref-item-output { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
