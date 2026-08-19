@@ -395,6 +395,10 @@
                                 title="@entry.Label">
                             <span class="tb-ref-item-label">@entry.Label</span>
                             <code class="tb-ref-item-code">@entry.Code</code>
+                            @if (entry.Expected is not null)
+                            {
+                                <span class="tb-ref-item-output">@entry.Expected</span>
+                            }
                         </button>
                     }
                 </div>
