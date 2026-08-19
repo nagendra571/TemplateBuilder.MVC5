@@ -241,7 +241,7 @@ _editor = SUNEDITOR.create(_canvasEl, {
         th:    'style|class|contenteditable|colspan|rowspan',
         all:   'data-*'
     },
-    onChange: () => { markDirty(); updateWordCount(); },
+    onChange: () => { markDirty(); updateWordCount(); refreshUsedMarks(); },
     linkTargetNewWindow: true,
     imageUploadBeforeHandler: function(files, info, core, uploadHandler) {
         const alt = (info?.altText ?? info?.alt ?? '').trim();
@@ -451,11 +451,13 @@ async function loadViewColumns(viewName) {
             palette.innerHTML = '<div class="tb-palette-msg">No columns found</div>';
             return;
         }
+        const used = _tbUsedFields(_editor ? _editor.getContents() : '');
         palette.innerHTML = columns.map(c => `
-            <div class="palette-field" draggable="true" data-field="${escapeHtml(c.name)}">
+            <div class="palette-field${used.has(c.name) ? ' palette-field--used' : ''}" draggable="true" data-field="${escapeHtml(c.name)}">
                 <span class="palette-field-label">${escapeHtml(c.name)}
-                    <span class="palette-field-type">${escapeHtml(c.dataType)}</span>
+                    <span class="palette-field-type">${escapeHtml(c.maxLength ? `${c.dataType}(${c.maxLength})` : c.dataType)}</span>
                 </span>
+                <span class="palette-field-used-mark" aria-hidden="true">${used.has(c.name) ? '&#10003;' : ''}</span>
                 <button type="button" class="palette-insert-btn"
                         aria-label="Insert ${escapeHtml(c.name)} field"
                         data-field="${escapeHtml(c.name)}">Insert</button>
@@ -501,9 +503,78 @@ function _tbGenerateSampleFromHtml(html) {
     return Object.keys(obj).length ? JSON.stringify(obj, null, 2) : '{}';
 }
 
+function _tbUsedFields(html) {
+    const used = new Set();
+    const scalarPat = /\{\{-?\s*model\.(\w+)\s*-?\}\}/g;
+    let m;
+    while ((m = scalarPat.exec(html)) !== null) used.add(m[1]);
+    const loopPat = /\{\{-?\s*for\s+\w+\s+in\s+model\.(\w+)\s*-?\}\}/g;
+    while ((m = loopPat.exec(html)) !== null) used.add(m[1]);
+    return used;
+}
+
 function _tbGenerateSampleFromTemplate() {
     if (!_editor) return '{}';
     return _tbGenerateSampleFromHtml(_editor.getContents());
+}
+
+async function generateSampleData(mode) {
+    const ta = document.getElementById('preview-json');
+    if (!ta) return;
+    const viewName = document.getElementById('view-selector')?.value || null;
+    const body = _editor ? _editor.getContents() : null;
+    try {
+        const res = await fetch('/Templates/Api/SampleData/Generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': _csrf
+            },
+            body: JSON.stringify({
+                viewName: mode === 'tokens' ? null : viewName,
+                templateBody: body
+            })
+        });
+        if (!res.ok) throw new Error('Generate failed');
+        const { sampleData } = await res.json();
+        if (!sampleData || !Object.keys(sampleData).length) {
+            showToast('Nothing to generate - add {{ model.X }} placeholders first');
+            return;
+        }
+        ta.value = JSON.stringify(sampleData, null, 2);
+        updateSampleSaveBtn();
+        showToast('Sample data generated');
+    } catch {
+        showToast('Could not generate sample data - check the template or view');
+    }
+}
+
+function updateSampleSaveBtn() {
+    const btn = document.getElementById('btn-gen-save');
+    if (!btn) return;
+    const ta = document.getElementById('preview-json');
+    const hasData = !!ta && !!ta.value.trim() && ta.value.trim() !== '{}';
+    btn.style.display = templateId && hasData ? '' : 'none';
+}
+
+async function saveSampleData() {
+    if (!templateId) return;
+    const ta = document.getElementById('preview-json');
+    try {
+        const res = await fetch(`/Templates/${templateId}/SampleData`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': _csrf
+            },
+            body: JSON.stringify({ sampleData: ta.value.trim() })
+        });
+        if (!res.ok) throw new Error('Save failed');
+        savedSampleData = ta.value.trim();
+        showToast('Sample data saved to template');
+    } catch {
+        showToast('Could not save sample data');
+    }
 }
 
 // Keyboard insert — event delegation on the palette container
@@ -517,6 +588,29 @@ document.getElementById('field-palette').addEventListener('click', (e) => {
     document.querySelector('.sun-editor-editable')?.focus();
     markDirty();
 });
+
+document.getElementById('palette-search')?.addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#field-palette .palette-field').forEach(row => {
+        const name = row.dataset.field?.toLowerCase() ?? '';
+        row.style.display = !q || name.includes(q) ? '' : 'none';
+    });
+});
+
+let _usedMarkTimer = null;
+function refreshUsedMarks() {
+    clearTimeout(_usedMarkTimer);
+    _usedMarkTimer = setTimeout(() => {
+        if (!_currentColumns.length) return;
+        const used = _tbUsedFields(_editor ? _editor.getContents() : '');
+        document.querySelectorAll('#field-palette .palette-field').forEach(row => {
+            const isUsed = used.has(row.dataset.field);
+            row.classList.toggle('palette-field--used', isUsed);
+            const mark = row.querySelector('.palette-field-used-mark');
+            if (mark) mark.innerHTML = isUsed ? '&#10003;' : '';
+        });
+    }, 1500);
+}
 
 // ── Save version ──────────────────────────────────────────────────────────────
 
@@ -566,6 +660,30 @@ async function saveVersion() {
         btn.disabled = false;
     }
 }
+
+document.getElementById('btn-gen-menu')?.addEventListener('click', () => {
+    const menu = document.getElementById('gen-menu');
+    const btn = document.getElementById('btn-gen-menu');
+    const willOpen = menu.hidden;
+    menu.hidden = !willOpen;
+    btn?.setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) menu.querySelector('button')?.focus();
+});
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('gen-menu');
+    if (!menu || menu.hidden) return;
+    if (!e.target.closest('.tb-dropdown')) menu.hidden = true;
+});
+
+document.querySelectorAll('.tb-gen-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('gen-menu').hidden = true;
+        generateSampleData(btn.dataset.gen);
+    });
+});
+
+document.getElementById('btn-gen-save')?.addEventListener('click', saveSampleData);
 
 // ── Version history modal ─────────────────────────────────────────────────────
 
@@ -710,13 +828,19 @@ async function restoreFromCompare(btn, versionId, sourceVersionNumber) {
 
 // ── Preview modal ─────────────────────────────────────────────────────────────
 
-function openPreview() {
+async function openPreview() {
     const modal = document.getElementById('preview-modal');
     modal.classList.add('open');
     const ta = document.getElementById('preview-json');
     if (!ta.value.trim() || ta.value.trim() === '{}') {
-        ta.value = _tbGenerateSampleFromTemplate();
+        if (savedSampleData) {
+            ta.value = savedSampleData;
+        } else {
+            const cta = document.getElementById('gen-cta');
+            if (!cta) await generateSampleData('both');
+        }
     }
+    updateSampleSaveBtn();
     trapFocus(modal);
 }
 
@@ -1462,6 +1586,7 @@ document.getElementById('btn-gen-sample')?.addEventListener('click', () => {
     const ta = document.getElementById('preview-json');
     ta.value = _tbGenerateSampleFromTemplate();
     ta.focus();
+    updateSampleSaveBtn();
 });
 document.getElementById('btn-validate-dismiss')?.addEventListener('click', () => {
     document.getElementById('validate-panel').hidden = true;
@@ -1823,6 +1948,60 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
     window._isSpecialCharsOpen = () => !panel.hidden;
 })();
 
+// ── Scriban reference panel ───────────────────────────────────────────────────
+
+(function () {
+    const panel    = document.getElementById('ref-panel');
+    const searchEl = document.getElementById('ref-search');
+    const groupsEl = document.getElementById('ref-groups');
+    if (!panel) return;
+
+    function renderGroups(query) {
+        const q = query.trim().toLowerCase();
+        document.querySelectorAll('#ref-groups .tb-ref-group').forEach(group => {
+            const label = group.querySelector('.tb-ref-group-label')?.textContent.toLowerCase() ?? '';
+            let visible = 0;
+            group.querySelectorAll('.tb-ref-item').forEach(item => {
+                const hay = (item.textContent ?? '').toLowerCase();
+                const show = !q || hay.includes(q) || label.includes(q);
+                item.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            group.style.display = visible ? '' : 'none';
+        });
+    }
+
+    function openPanel() {
+        searchEl.value = '';
+        renderGroups('');
+        panel.hidden = false;
+        searchEl.focus();
+    }
+
+    function closePanel() {
+        panel.hidden = true;
+        document.querySelector('.sun-editor-editable')?.focus();
+    }
+
+    searchEl.addEventListener('input', e => renderGroups(e.target.value));
+
+    groupsEl.addEventListener('click', e => {
+        const btn = e.target.closest('.tb-ref-item');
+        if (!btn || !_editor) return;
+        _editor.insertText(btn.dataset.code + ' ');
+        markDirty();
+        closePanel();
+        showToast(`Inserted: ${btn.dataset.label}`);
+    });
+
+    document.getElementById('btn-ref-close')?.addEventListener('click', closePanel);
+    document.getElementById('btn-ref-open')?.addEventListener('click', openPanel);
+
+    window._openScribanReference = openPanel;
+    window._closeScribanReference = closePanel;
+    window._isScribanReferenceOpen = () => !panel.hidden;
+})();
+
 // ── Find & Replace ────────────────────────────────────────────────────────────
 
 (function wireFindReplace() {
@@ -2049,6 +2228,7 @@ function saveDraft() {
     try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
             body: _editor.getContents(),
+            sampleData: document.getElementById('preview-json')?.value ?? null,
             timestamp: Date.now(),
             versionNumber: currentVersionNumber
         }));
@@ -2073,6 +2253,8 @@ function loadDraft() {
         banner.hidden = false;
         document.getElementById('btn-draft-restore')?.addEventListener('click', () => {
             _editor.setContents(draft.body);
+            const pv = document.getElementById('preview-json');
+            if (pv && draft.sampleData) pv.value = draft.sampleData;
             markDirty();
             updateWordCount();
             clearDraft();
