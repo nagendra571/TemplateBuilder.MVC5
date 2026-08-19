@@ -15,6 +15,9 @@ public class TemplateBuilderDbContext : DbContext
     public DbSet<Template> Templates { get; set; } = null!;
     public DbSet<TemplateVersion> TemplateVersions { get; set; } = null!;
     public DbSet<Snippet> Snippets { get; set; } = null!;
+    public DbSet<AuditLog> AuditLogs { get; set; } = null!;
+    public DbSet<SnippetVersion> SnippetVersions { get; set; } = null!;
+    public DbSet<SnippetUsage> SnippetUsages { get; set; } = null!;
 
     protected override void OnModelCreating(DbModelBuilder modelBuilder)
     {
@@ -30,6 +33,7 @@ public class TemplateBuilderDbContext : DbContext
         template.Property(t => t.TemplateType).IsRequired().HasMaxLength(50);
         template.Property(t => t.Description).HasMaxLength(500);
         template.Property(t => t.RowVersion).IsRowVersion();
+        template.Property(t => t.ReviewComment).HasMaxLength(1000);
         template.HasMany(t => t.Versions)
             .WithRequired(v => v.Template)
             .HasForeignKey(v => v.TemplateId)
@@ -45,6 +49,14 @@ public class TemplateBuilderDbContext : DbContext
         version.Property(v => v.Body).IsRequired();
         version.Property(v => v.ChangeComment).HasMaxLength(500);
         version.Property(v => v.CreatedBy).HasMaxLength(200);
+        version.Property(v => v.TemplateId)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_TemplateVersions_TemplateId_VersionNumber", 0) { IsUnique = true }));
+        version.Property(v => v.VersionNumber)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_TemplateVersions_TemplateId_VersionNumber", 1) { IsUnique = true }));
 
         var snippet = modelBuilder.Entity<Snippet>();
         snippet.ToTable("Snippets");
@@ -57,5 +69,64 @@ public class TemplateBuilderDbContext : DbContext
                 new IndexAnnotation(new IndexAttribute("IX_Snippets_Name") { IsUnique = true }));
         snippet.Property(s => s.Description).HasMaxLength(500);
         snippet.Property(s => s.Body).IsRequired();
+        snippet.Property(s => s.RowVersion).IsRowVersion();
+        snippet.HasMany(s => s.Versions)
+            .WithRequired(v => v.Snippet)
+            .HasForeignKey(v => v.SnippetId)
+            .WillCascadeOnDelete(false);
+
+        var snippetVersion = modelBuilder.Entity<SnippetVersion>();
+        snippetVersion.ToTable("SnippetVersions");
+        snippetVersion.HasKey(v => v.Id);
+        snippetVersion.Property(v => v.Body).IsRequired();
+        snippetVersion.Property(v => v.ChangeComment).HasMaxLength(500);
+        snippetVersion.Property(v => v.CreatedBy).HasMaxLength(200);
+        snippetVersion.Property(v => v.SnippetId)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_SnippetVersions_SnippetId_VersionNumber", 0) { IsUnique = true }));
+        snippetVersion.Property(v => v.VersionNumber)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_SnippetVersions_SnippetId_VersionNumber", 1) { IsUnique = true }));
+
+        var audit = modelBuilder.Entity<AuditLog>();
+        audit.ToTable("AuditLogs");
+        audit.HasKey(a => a.Id);
+        audit.Property(a => a.EntityType).IsRequired().HasMaxLength(20);
+        audit.Property(a => a.Action).IsRequired().HasMaxLength(40);
+        audit.Property(a => a.Actor).IsRequired().HasMaxLength(200);
+        audit.Property(a => a.BeforeState).HasMaxLength(4000);
+        audit.Property(a => a.AfterState).HasMaxLength(4000);
+        audit.Property(a => a.Comment).HasMaxLength(1000);
+        audit.Property(a => a.EntityId)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_AuditLogs_Entity", 0)));
+        audit.Property(a => a.EntityType)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_AuditLogs_Entity", 1)));
+        audit.Property(a => a.OccurredAt)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_AuditLogs_Entity", 2)));
+        audit.Property(a => a.OccurredAt)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_AuditLogs_OccurredAt")));
+
+        var usage = modelBuilder.Entity<SnippetUsage>();
+        usage.ToTable("SnippetUsages");
+        usage.HasKey(u => u.Id);
+        usage.Property(u => u.UsedBy).HasMaxLength(200);
+        usage.Property(u => u.SnippetId)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_SnippetUsages_SnippetId")));
+        usage.Property(u => u.TemplateId)
+            .HasColumnAnnotation(
+                IndexAnnotation.AnnotationName,
+                new IndexAnnotation(new IndexAttribute("IX_SnippetUsages_TemplateId")));
     }
 }

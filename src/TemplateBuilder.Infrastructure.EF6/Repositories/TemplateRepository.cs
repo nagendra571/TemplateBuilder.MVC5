@@ -1,4 +1,5 @@
 using System.Data.Entity;
+using System.Data.Entity.Infrastructure;
 using TemplateBuilder.Domain.Entities;
 using TemplateBuilder.Domain.Interfaces;
 using TemplateBuilder.Infrastructure.EF6.Data;
@@ -59,17 +60,44 @@ public class TemplateRepository : ITemplateRepository
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task<TemplateVersion> PublishVersionAsync(int templateId, TemplateVersion version, CancellationToken ct = default)
+    public Task<TemplateVersion> PublishVersionAsync(int templateId, TemplateVersion version, CancellationToken ct = default)
+        => PublishVersionAsync(templateId, version, null, ct);
+
+    public async Task<TemplateVersion> PublishVersionAsync(int templateId, TemplateVersion version, Action<Template>? updateTemplate, CancellationToken ct = default)
     {
         version.CreatedAt = DateTime.UtcNow;
-        _db.TemplateVersions.Add(version);
-        await _db.SaveChangesAsync(ct);
 
-        var template = await _db.Templates.FirstAsync(t => t.Id == templateId, ct);
-        template.CurrentVersionId = version.Id;
-        template.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            var max = await _db.TemplateVersions.Where(v => v.TemplateId == templateId)
+                .Select(v => (int?)v.VersionNumber).MaxAsync(ct);
+            version.VersionNumber = (max ?? 0) + 1;
 
-        return version;
+            using var tx = _db.Database.BeginTransaction();   // fresh transaction per attempt
+            try
+            {
+                _db.TemplateVersions.Add(version);
+                await _db.SaveChangesAsync(ct);
+
+                var template = await _db.Templates.FirstAsync(t => t.Id == templateId, ct);
+                template.CurrentVersionId = version.Id;
+                template.UpdatedAt = DateTime.UtcNow;
+                updateTemplate?.Invoke(template);
+                await _db.SaveChangesAsync(ct);
+
+                tx.Commit();
+                return version;
+            }
+            catch (DbUpdateException) when (attempt < 5)
+            {
+                // Unique (TemplateId, VersionNumber) violation from a concurrent publish — retry with a fresh number.
+                _db.Entry(version).State = EntityState.Detached;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
     }
 }

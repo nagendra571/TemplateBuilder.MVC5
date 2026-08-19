@@ -9,4 +9,5 @@ public class Snippet
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    public ICollection<SnippetVersion> Versions { get; set; } = new List<SnippetVersion>();
 }

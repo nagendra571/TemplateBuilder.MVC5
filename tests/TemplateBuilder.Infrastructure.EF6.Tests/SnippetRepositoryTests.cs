@@ -79,4 +79,73 @@ public class SnippetRepositoryTests
 
         await act.Should().ThrowAsync<System.Data.Entity.Infrastructure.DbUpdateException>();
     }
+
+    [Fact]
+    public async Task UpdateWithVersionAsync_creates_version_when_body_changes()
+    {
+        using var ctx = CreateContext();
+        var repo = new SnippetRepository(ctx);
+        var s = await repo.CreateAsync(new Snippet { Name = "V Snippet", Description = "d", Body = "v1" });
+
+        s.Body = "v2";
+        await repo.UpdateWithVersionAsync(s, "v1", "second version", "bob");
+
+        var versions = await repo.GetVersionHistoryAsync(s.Id);
+        versions.Should().HaveCount(2);
+        versions[0].VersionNumber.Should().Be(1);
+        versions[1].VersionNumber.Should().Be(2);
+        versions[1].Body.Should().Be("v2");
+        versions[1].CreatedBy.Should().Be("bob");
+        (await repo.GetByIdAsync(s.Id))!.Body.Should().Be("v2");
+    }
+
+    [Fact]
+    public async Task UpdateWithVersionAsync_skips_version_when_body_unchanged()
+    {
+        using var ctx = CreateContext();
+        var repo = new SnippetRepository(ctx);
+        var s = await repo.CreateAsync(new Snippet { Name = "No Change Snippet", Description = "d", Body = "same" });
+
+        await repo.UpdateWithVersionAsync(s, "same", "no change", "bob");
+
+        (await repo.GetVersionHistoryAsync(s.Id)).Should().HaveCount(0);
+    }
+
+    [Fact]
+    public async Task RestoreVersionAsync_creates_new_version_with_restored_body()
+    {
+        using var ctx = CreateContext();
+        var repo = new SnippetRepository(ctx);
+        var s = await repo.CreateAsync(new Snippet { Name = "Restore Snippet", Description = "d", Body = "v1" });
+        s.Body = "v2";
+        await repo.UpdateWithVersionAsync(s, "v1", "second", "bob");
+        var versions = await repo.GetVersionHistoryAsync(s.Id);
+        var v1 = versions[0];
+
+        var restored = await repo.RestoreVersionAsync(s.Id, v1.Id, "bob");
+
+        restored.Body.Should().Be("v1");
+        var after = await repo.GetVersionHistoryAsync(s.Id);
+        after.Should().HaveCount(3);
+        after[2].VersionNumber.Should().Be(3);
+        after[2].ChangeComment.Should().Be("Restored from v1");
+    }
+
+    [Fact]
+    public async Task RecordUsageAsync_and_GetUsageStatsAsync_report_inserts()
+    {
+        using var ctx = CreateContext();
+        var repo = new SnippetRepository(ctx);
+        var s = await repo.CreateAsync(new Snippet { Name = "Used Snippet", Description = "d", Body = "b" });
+
+        await repo.RecordUsageAsync(s.Id, 11, "bob");
+        await repo.RecordUsageAsync(s.Id, 11, "bob");
+        await repo.RecordUsageAsync(s.Id, 12, "alice");
+
+        var stats = await repo.GetUsageStatsAsync();
+        var stat = stats.Single(x => x.SnippetId == s.Id);
+        stat.UsageCount.Should().Be(3);
+        stat.TemplateCount.Should().Be(2);
+        stat.LastUsedAt.Should().NotBeNull();
+    }
 }
