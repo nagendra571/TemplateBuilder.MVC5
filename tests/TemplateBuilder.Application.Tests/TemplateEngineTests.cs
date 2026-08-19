@@ -30,6 +30,39 @@ public class TemplateEngineTests
     }
 
     [Fact]
+    public async Task RenderBodyAsync_renders_model_prefixed_properties()
+    {
+        var engine = CreateEngine();
+        var result = await engine.RenderBodyAsync("Hi {{model.name}}, you have {{model.count}} messages.", new { name = "Alice", count = 3 });
+        result.Should().Be("Hi Alice, you have 3 messages.");
+    }
+
+    [Fact]
+    public async Task RenderBodyAsync_renders_model_prefixed_loop()
+    {
+        var engine = CreateEngine();
+        var result = await engine.RenderBodyAsync(
+            "{{ for item in model.Items }}{{ item.Name }}{{ end }}",
+            new Dictionary<string, object>
+            {
+                ["Items"] = new object[]
+                {
+                    new Dictionary<string, object> { ["Name"] = "A" },
+                    new Dictionary<string, object> { ["Name"] = "B" }
+                }
+            });
+        result.Should().Be("AB");
+    }
+
+    [Fact]
+    public async Task RenderBodyAsync_does_not_override_caller_provided_model_member()
+    {
+        var engine = CreateEngine();
+        var result = await engine.RenderBodyAsync("Hi {{model.name}}!", new { model = new { name = "Bob" } });
+        result.Should().Be("Hi Bob!");
+    }
+
+    [Fact]
     public async Task RenderBodyAsync_renders_html_markup()
     {
         var engine = CreateEngine();

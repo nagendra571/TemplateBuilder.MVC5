@@ -50,10 +50,17 @@ public class TemplateEngine : ITemplateEngine
             var culture = CultureInfo.GetCultureInfo(_options.DefaultCulture);
             var scriptObject = new ScriptObject();
             scriptObject.Import(model);
-            var context = new TemplateContext(scriptObject)
+            if (!scriptObject.ContainsKey("model"))
+            {
+                var modelObject = new ScriptObject();
+                modelObject.Import(model);
+                scriptObject["model"] = modelObject;
+            }
+            var context = new TemplateContext
             {
                 CancellationToken = ct
             };
+            context.PushGlobal(scriptObject);
             context.PushCulture(culture);
             try
             {
