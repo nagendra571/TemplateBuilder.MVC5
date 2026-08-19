@@ -67,6 +67,7 @@ public class TemplatesController : TemplateBuilderControllerBase
         var model = await Request.ReadJsonBodyAsync<TemplateEditorViewModel>();
         if (string.IsNullOrWhiteSpace(model.Name))
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", "Template name is required."));
+        int createdId;
         try
         {
             var template = await _repository.CreateAsync(new Template
@@ -75,6 +76,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 TemplateType = model.TemplateType,
                 Description = model.Description
             });
+            createdId = template.Id;
 
             if (!string.IsNullOrWhiteSpace(model.Body))
             {
@@ -86,14 +88,13 @@ public class TemplatesController : TemplateBuilderControllerBase
                     ChangeComment = "Initial version"
                 });
             }
-
-            await _audit.RecordAsync("Template", template.Id, AuditActions.Created, CurrentActor, afterState: $"{{\"name\":\"{template.Name}\"}}");
-            return JsonOk(new { templateId = template.Id });
         }
         catch (DbUpdateException)
         {
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", $"A template named '{model.Name.Trim()}' already exists."));
         }
+        await _audit.RecordAsync("Template", createdId, AuditActions.Created, CurrentActor, afterState: JsonConvert.SerializeObject(new { name = model.Name.Trim() }));
+        return JsonOk(new { templateId = createdId });
     }
 
     [Route("Templates/{id:int}/Edit")]
@@ -112,9 +113,7 @@ public class TemplatesController : TemplateBuilderControllerBase
             Status = template.Status.ToString(),
             DraftBody = template.DraftBody,
             ReviewComment = template.ReviewComment,
-            Body = template.Status == TemplateStatus.Review || template.Status == TemplateStatus.Approved
-                ? template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty
-                : template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
+            Body = template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
             AvailableViews = views.ToList(),
@@ -131,6 +130,7 @@ public class TemplatesController : TemplateBuilderControllerBase
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", "Template name is required."));
         var template = await _repository.GetByIdAsync(id);
         if (template is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Template {id} not found."));
+        TemplateVersion published;
         try
         {
             template.Name = request.Name.Trim();
@@ -138,15 +138,13 @@ public class TemplatesController : TemplateBuilderControllerBase
             template.Description = request.Description;
             await _repository.UpdateTemplateAsync(template);
             var nextNumber = await _repository.GetNextVersionNumberAsync(id);
-            var version = await _repository.PublishVersionAsync(id, new TemplateVersion
+            published = await _repository.PublishVersionAsync(id, new TemplateVersion
             {
                 TemplateId = id,
                 VersionNumber = nextNumber,
                 Body = request.Body,
                 ChangeComment = request.ChangeComment
             });
-            await _audit.RecordAsync("Template", id, AuditActions.Published, CurrentActor, afterState: $"{{\"versionNumber\":{version.VersionNumber},\"versionId\":{version.Id}}}");
-            return JsonOk(new { versionId = version.Id, versionNumber = version.VersionNumber });
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -156,6 +154,8 @@ public class TemplatesController : TemplateBuilderControllerBase
         {
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", $"A template named '{request.Name.Trim()}' already exists."));
         }
+        await _audit.RecordAsync("Template", id, AuditActions.Published, CurrentActor, afterState: JsonConvert.SerializeObject(new { versionNumber = published.VersionNumber, versionId = published.Id }));
+        return JsonOk(new { versionId = published.Id, versionNumber = published.VersionNumber });
     }
 
     [Route("Templates/{id:int}/Versions")]
@@ -181,25 +181,26 @@ public class TemplatesController : TemplateBuilderControllerBase
     [HttpPost, ValidateJsonAntiForgeryToken]
     public async Task<ActionResult> RestoreVersion(int id, int versionId, int sourceVersionNumber)
     {
+        TemplateVersion published;
         try
         {
             var oldBody = await _repository.GetVersionBodyAsync(versionId);
             if (oldBody is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Version {versionId} not found."));
             var nextNumber = await _repository.GetNextVersionNumberAsync(id);
-            var version = await _repository.PublishVersionAsync(id, new TemplateVersion
+            published = await _repository.PublishVersionAsync(id, new TemplateVersion
             {
                 TemplateId = id,
                 VersionNumber = nextNumber,
                 Body = oldBody,
                 ChangeComment = $"Restored from v{sourceVersionNumber}"
             });
-            await _audit.RecordAsync("Template", id, AuditActions.Restored, CurrentActor, comment: $"Restored from v{sourceVersionNumber}");
-            return JsonOk(new { versionId = version.Id, versionNumber = version.VersionNumber });
         }
         catch (DbUpdateConcurrencyException)
         {
             return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user while you were editing. Please refresh and try again."));
         }
+        await _audit.RecordAsync("Template", id, AuditActions.Restored, CurrentActor, comment: $"Restored from v{sourceVersionNumber}");
+        return JsonOk(new { versionId = published.Id, versionNumber = published.VersionNumber });
     }
 
     [Route("Templates/Api/Views/{viewName}/Columns")]
@@ -275,7 +276,7 @@ public class TemplatesController : TemplateBuilderControllerBase
         if (template is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Template {id} not found."));
         template.IsActive = !template.IsActive;
         await _repository.UpdateTemplateAsync(template);
-        await _audit.RecordAsync("Template", id, AuditActions.ToggledActive, CurrentActor, afterState: $"{{\"isActive\":{template.IsActive.ToString().ToLowerInvariant()}}}");
+        await _audit.RecordAsync("Template", id, AuditActions.ToggledActive, CurrentActor, afterState: JsonConvert.SerializeObject(new { isActive = template.IsActive }));
         return JsonOk(new { isActive = template.IsActive });
     }
 
@@ -309,6 +310,7 @@ public class TemplatesController : TemplateBuilderControllerBase
         if (source is null) return HttpNotFound();
 
         var body = source.CurrentVersion?.Body ?? string.Empty;
+        int newId;
         try
         {
             var newTemplate = await _repository.CreateAsync(new Template
@@ -317,6 +319,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 TemplateType = source.TemplateType,
                 Description = source.Description
             });
+            newId = newTemplate.Id;
 
             await _repository.PublishVersionAsync(newTemplate.Id, new TemplateVersion
             {
@@ -325,14 +328,13 @@ public class TemplatesController : TemplateBuilderControllerBase
                 Body = body,
                 ChangeComment = $"Duplicated from '{source.Name}'"
             });
-
-            await _audit.RecordAsync("Template", newTemplate.Id, AuditActions.Duplicated, CurrentActor, comment: $"Duplicated from template {source.Id}");
-            return JsonOk(new { id = newTemplate.Id });
         }
         catch (DbUpdateException)
         {
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", $"A template named '{request.NewName.Trim()}' already exists."));
         }
+        await _audit.RecordAsync("Template", newId, AuditActions.Duplicated, CurrentActor, comment: $"Duplicated from template {source.Id}");
+        return JsonOk(new { id = newId });
     }
 
     [Route("Templates/{id:int}/Draft")]
