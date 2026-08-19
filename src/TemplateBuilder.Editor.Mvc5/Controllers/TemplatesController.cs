@@ -24,13 +24,15 @@ public class TemplatesController : TemplateBuilderControllerBase
     private readonly ISqlViewDiscoveryService _viewDiscovery;
     private readonly ITemplateEngine _engine;
     private readonly IHtmlSanitizerService _sanitizer;
+    private readonly ISampleDataGenerator _sampleDataGenerator;
 
-    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer)
+    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator)
     {
         _repository = repository;
         _viewDiscovery = viewDiscovery;
         _engine = engine;
         _sanitizer = sanitizer;
+        _sampleDataGenerator = sampleDataGenerator;
     }
 
     [HttpGet]
@@ -105,7 +107,8 @@ public class TemplatesController : TemplateBuilderControllerBase
             Body = template.CurrentVersion?.Body ?? string.Empty,
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
-            AvailableViews = views.ToList()
+            AvailableViews = views.ToList(),
+            SampleData = template.SampleData
         });
     }
 
@@ -229,6 +232,27 @@ public class TemplatesController : TemplateBuilderControllerBase
         {
             return JsonError(400, new ErrorResult("TEMPLATE_RENDER_ERROR", "Template rendering failed. Check template syntax."));
         }
+    }
+
+    [Route("Templates/Api/SampleData/Generate")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> GenerateSampleData()
+    {
+        var request = await Request.ReadJsonBodyAsync<GenerateSampleDataRequest>();
+        var data = await _sampleDataGenerator.GenerateAsync(request?.ViewName, request?.TemplateBody);
+        return Content(JsonConvert.SerializeObject(new { sampleData = data }), "application/json");
+    }
+
+    [Route("Templates/{id:int}/SampleData")]
+    [HttpPut, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> SaveSampleData(int id)
+    {
+        var request = await Request.ReadJsonBodyAsync<SaveSampleDataRequest>();
+        var template = await _repository.GetByIdAsync(id);
+        if (template is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Template {id} not found."));
+        template.SampleData = string.IsNullOrWhiteSpace(request?.SampleData) ? null : request.SampleData;
+        await _repository.UpdateTemplateAsync(template);
+        return JsonOk(new { saved = true });
     }
 
     [Route("Templates/{id:int}/ToggleActive")]

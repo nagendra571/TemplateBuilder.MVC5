@@ -36,6 +36,7 @@ public static class UnityContainerExtensions
         container.RegisterType<ISnippetRepository, SnippetRepository>(new HierarchicalLifetimeManager());
         container.RegisterType<IHtmlSanitizerService, HtmlSanitizerService>(new ContainerControlledLifetimeManager());
         container.RegisterType<ITemplateEngine, TemplateEngine>(new HierarchicalLifetimeManager());
+        container.RegisterType<ISampleDataGenerator, SampleDataGenerator>(new HierarchicalLifetimeManager());
         container.RegisterInstance(new TemplateBuilderOptions());
         container.RegisterFactory<ISqlViewDiscoveryService>(
             c => new SqlViewDiscoveryService(connectionString, c.Resolve<TemplateBuilderOptions>()),
