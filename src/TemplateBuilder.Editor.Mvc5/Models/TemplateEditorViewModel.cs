@@ -21,5 +21,8 @@ public class TemplateEditorViewModel
     public string? Body { get; set; }
     public int? CurrentVersionId { get; set; }
     public int CurrentVersionNumber { get; set; }
+    public string Status { get; set; } = "Draft";
+    public string? DraftBody { get; set; }
+    public string? ReviewComment { get; set; }
     public List<string> AvailableViews { get; set; } = new();
 }

@@ -25,14 +25,20 @@ public class TemplatesController : TemplateBuilderControllerBase
     private readonly ITemplateEngine _engine;
     private readonly IHtmlSanitizerService _sanitizer;
     private readonly ISampleDataGenerator _sampleDataGenerator;
+    private readonly ITemplateWorkflowService _workflow;
+    private readonly IAuditService _audit;
+    private readonly IAuditRepository _auditRepository;
 
-    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator)
+    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator, ITemplateWorkflowService workflow, IAuditService audit, IAuditRepository auditRepository)
     {
         _repository = repository;
         _viewDiscovery = viewDiscovery;
         _engine = engine;
         _sanitizer = sanitizer;
         _sampleDataGenerator = sampleDataGenerator;
+        _workflow = workflow;
+        _audit = audit;
+        _auditRepository = auditRepository;
     }
 
     [HttpGet]
@@ -81,6 +87,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 });
             }
 
+            await _audit.RecordAsync("Template", template.Id, AuditActions.Created, CurrentActor, afterState: $"{{\"name\":\"{template.Name}\"}}");
             return JsonOk(new { templateId = template.Id });
         }
         catch (DbUpdateException)
@@ -102,7 +109,12 @@ public class TemplatesController : TemplateBuilderControllerBase
             Name = template.Name,
             TemplateType = template.TemplateType,
             Description = template.Description,
-            Body = template.CurrentVersion?.Body ?? string.Empty,
+            Status = template.Status.ToString(),
+            DraftBody = template.DraftBody,
+            ReviewComment = template.ReviewComment,
+            Body = template.Status == TemplateStatus.Review || template.Status == TemplateStatus.Approved
+                ? template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty
+                : template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
             AvailableViews = views.ToList(),
@@ -133,6 +145,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 Body = request.Body,
                 ChangeComment = request.ChangeComment
             });
+            await _audit.RecordAsync("Template", id, AuditActions.Published, CurrentActor, afterState: $"{{\"versionNumber\":{version.VersionNumber},\"versionId\":{version.Id}}}");
             return JsonOk(new { versionId = version.Id, versionNumber = version.VersionNumber });
         }
         catch (DbUpdateConcurrencyException)
@@ -180,6 +193,7 @@ public class TemplatesController : TemplateBuilderControllerBase
                 Body = oldBody,
                 ChangeComment = $"Restored from v{sourceVersionNumber}"
             });
+            await _audit.RecordAsync("Template", id, AuditActions.Restored, CurrentActor, comment: $"Restored from v{sourceVersionNumber}");
             return JsonOk(new { versionId = version.Id, versionNumber = version.VersionNumber });
         }
         catch (DbUpdateConcurrencyException)
@@ -261,6 +275,7 @@ public class TemplatesController : TemplateBuilderControllerBase
         if (template is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Template {id} not found."));
         template.IsActive = !template.IsActive;
         await _repository.UpdateTemplateAsync(template);
+        await _audit.RecordAsync("Template", id, AuditActions.ToggledActive, CurrentActor, afterState: $"{{\"isActive\":{template.IsActive.ToString().ToLowerInvariant()}}}");
         return JsonOk(new { isActive = template.IsActive });
     }
 
@@ -311,11 +326,82 @@ public class TemplatesController : TemplateBuilderControllerBase
                 ChangeComment = $"Duplicated from '{source.Name}'"
             });
 
+            await _audit.RecordAsync("Template", newTemplate.Id, AuditActions.Duplicated, CurrentActor, comment: $"Duplicated from template {source.Id}");
             return JsonOk(new { id = newTemplate.Id });
         }
         catch (DbUpdateException)
         {
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", $"A template named '{request.NewName.Trim()}' already exists."));
         }
+    }
+
+    [Route("Templates/{id:int}/Draft")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> SaveDraft(int id)
+    {
+        var request = await Request.ReadJsonBodyAsync<SaveDraftRequest>();
+        return await RunWorkflow(() => _workflow.SaveDraftAsync(id, request?.Body ?? string.Empty, CurrentActor));
+    }
+
+    [Route("Templates/{id:int}/SubmitForReview")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> SubmitForReview(int id)
+    {
+        var request = await Request.ReadJsonBodyAsync<SubmitForReviewRequest>();
+        return await RunWorkflow(() => _workflow.SubmitForReviewAsync(id, request?.Body ?? string.Empty, CurrentActor));
+    }
+
+    [Route("Templates/{id:int}/Approve")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> Approve(int id)
+        => await RunWorkflow(() => _workflow.ApproveAsync(id, CurrentActor));
+
+    [Route("Templates/{id:int}/Reject")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> Reject(int id)
+    {
+        var request = await Request.ReadJsonBodyAsync<RejectRequest>();
+        return await RunWorkflow(() => _workflow.RejectAsync(id, request?.Comment ?? string.Empty, CurrentActor));
+    }
+
+    [Route("Templates/{id:int}/CancelReview")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> CancelReview(int id)
+        => await RunWorkflow(() => _workflow.CancelReviewAsync(id, CurrentActor));
+
+    [Route("Templates/{id:int}/Publish")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> Publish(int id)
+        => await RunWorkflow(() => _workflow.PublishAsync(id, CurrentActor));
+
+    [Route("Templates/{id:int}/Audit")]
+    [HttpGet]
+    public async Task<ActionResult> GetAuditTimeline(int id)
+    {
+        var rows = await _auditRepository.QueryAsync(new AuditQuery { EntityType = "Template", EntityId = id, PageSize = 100 });
+        return JsonOk(rows.Select(a => new { a.Id, a.Action, a.Actor, a.OccurredAt, a.Comment }));
+    }
+
+    private async Task<ActionResult> RunWorkflow(Func<Task<TemplateWorkflowResult>> action)
+    {
+        try
+        {
+            return MapWorkflowResult(await action());
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user. Please refresh and try again."));
+        }
+    }
+
+    private ActionResult MapWorkflowResult(TemplateWorkflowResult result)
+    {
+        if (result.Success) return JsonOk(new { status = result.Template?.Status.ToString() });
+        return result.ErrorCode switch
+        {
+            "NOT_FOUND" => JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", result.ErrorMessage!)),
+            "CONFLICT" => JsonError(409, new ErrorResult("CONFLICT", result.ErrorMessage!)),
+            _ => JsonError(400, new ErrorResult("VALIDATION_ERROR", result.ErrorMessage!))
+        };
     }
 }
