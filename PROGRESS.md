@@ -133,7 +133,7 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
   `{"sampleData":{"RecipientName":"Jane Doe","Amount":1250.00}}`; create-mode (templateBody
   only) -> 200; `PUT /Templates/1/SampleData` `{"sampleData":"{\"a\":1}"}` -> 200
   `{"saved":true}`; Edit reload contains `savedSampleData = "{\"a\":1}"`; Edit page HTML
-  contains `palette-search`, `btn-ref-open`, `ref-groups` (15 `tb-ref-group` sections, 15
+  contains `palette-search`, `btn-ref-open`, `ref-groups` (7 `tb-ref-group` sections (15 items), 15
   `tb-ref-item` with code/label/output spans); JS 200 and contains `SampleData/Generate`,
   `btn-ref-open` open-handler, `palette-search` input handler, draft autosave (localStorage
   `tb-draft-*`); CSS 200 and contains `.tb-ref-panel`; Preview POST (body + modelJson) ->
@@ -142,7 +142,7 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
 - Final gates: `dotnet build TemplateBuilder.Mvc5.sln` 0 errors (9 pre-existing warnings);
   Domain 16/16; Application 50/50 (baseline 22 + Task 1-2 suite incl. SampleDataGenerator 9 +
   ScribanReferenceCatalog 2 + new TemplateEngine cases); Infrastructure.EF6 13/13
-  (baseline 11 + SampleData round-trip/migration tests); `node --check template-editor.js` OK;
+  (baseline 11 + SampleData round-trip tests (migration validity came from the sqlcmd column check + host boot)); `node --check template-editor.js` OK;
   sample host xbuild 0 errors.
 - Packaging follow-up (post-smoke): the fresh host boot exposed that the editor's views call
   `Html.AntiForgeryToken()` (System.Web.Helpers), which no package dependency supplied — real

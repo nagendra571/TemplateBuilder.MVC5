@@ -532,7 +532,7 @@ async function generateSampleData(mode) {
             },
             body: JSON.stringify({
                 viewName: mode === 'tokens' ? null : viewName,
-                templateBody: body
+                templateBody: mode === 'view' ? null : body
             })
         });
         if (!res.ok) throw new Error('Generate failed');
