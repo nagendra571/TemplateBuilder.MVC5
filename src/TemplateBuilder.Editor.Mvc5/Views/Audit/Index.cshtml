@@ -2,51 +2,211 @@
 @model AuditIndexViewModel
 @{
     ViewBag.Title = "Audit Log";
+    var stats = Model.Stats;
+    var pageCount = (int)System.Math.Ceiling((double)System.Math.Max(1, Model.Total) / Model.PageSize);
+    var firstShown = Model.Total == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var lastShown = System.Math.Min(Model.Page * Model.PageSize, Model.Total);
 }
 
-<div id="tb-editor-host">
-    <h2>Audit Log</h2>
-    <p class="subtitle">Append-only record of who did what and when. @Model.Total total events.</p>
+<div id="tb-editor-host" class="tb-audit-page">
+    <div class="tb-page-content">
 
-    <form method="get" action="@Url.Action("Index")" class="tb-audit-filters">
-        <input type="text" name="search" value="@Model.Search" placeholder="Search action / actor / comment" />
-        <select name="entityType">
-            <option value="">All types</option>
-            <option value="Template" @(Model.EntityType == "Template" ? "selected" : "")>Templates</option>
-            <option value="Snippet" @(Model.EntityType == "Snippet" ? "selected" : "")>Snippets</option>
-        </select>
-        <input type="text" name="actionName" value="@Model.Action" placeholder="Action (exact)" />
-        <input type="text" name="actor" value="@Model.Actor" placeholder="Actor" />
-        <input type="text" name="from" placeholder="From (yyyy-MM-dd)" value="@Model.From" />
-        <input type="text" name="to" placeholder="To (yyyy-MM-dd)" value="@Model.To" />
-        <button type="submit" class="btn btn-primary">Filter</button>
-        <a class="btn btn-ghost" href="@Url.Action("Export", "Audit", new { search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">⬇ Export CSV</a>
-    </form>
+        <div class="tb-page-header">
+            <div>
+                <h1 class="tb-page-title">Audit Log</h1>
+                <p class="tb-audit-subtitle">Append-only record of who did what and when.</p>
+            </div>
+            <div class="tb-audit-header-actions">
+                <span id="tb-live-pill" class="tb-live-pill"><span class="tb-live-dot"></span> Live</span>
+                <a class="btn btn-secondary" href="@Url.Action("Export", "Audit", new { search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">Export CSV</a>
+            </div>
+        </div>
 
-    <table class="tb-audit-table">
-        <thead>
-            <tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Comment</th></tr>
-        </thead>
-        <tbody>
-        @foreach (var r in Model.Rows)
-        {
-            <tr>
-                <td>@r.OccurredAt.ToLocalTime().ToString("g")</td>
-                <td>@r.Actor</td>
-                <td>@r.Action</td>
-                <td>@r.EntityType #@r.EntityId</td>
-                <td>@r.Comment</td>
-            </tr>
-        }
-        </tbody>
-    </table>
+        <div class="tb-audit-stats">
+            <div class="tb-audit-stat">
+                <div class="tb-audit-stat-value" id="tb-audit-total" data-total="@stats.Total">@stats.Total.ToString("N0")</div>
+                <div class="tb-audit-stat-label">Total events</div>
+            </div>
+            <div class="tb-audit-stat">
+                <div class="tb-audit-stat-value" id="tb-stat-templates">@stats.TemplateCount.ToString("N0")</div>
+                <div class="tb-audit-stat-label">Templates</div>
+            </div>
+            <div class="tb-audit-stat">
+                <div class="tb-audit-stat-value" id="tb-stat-snippets">@stats.SnippetCount.ToString("N0")</div>
+                <div class="tb-audit-stat-label">Snippets</div>
+            </div>
+            <div class="tb-audit-stat">
+                <div class="tb-audit-stat-value" id="tb-stat-actors">@stats.UniqueActors.ToString("N0")</div>
+                <div class="tb-audit-stat-label">Active users</div>
+            </div>
+            <div class="tb-audit-stat">
+                <div class="tb-audit-stat-value" id="tb-stat-range" style="font-size:15px;padding-top:5px;">—</div>
+                <div class="tb-audit-stat-label">Activity range</div>
+            </div>
+        </div>
 
-    @if (Model.Page > 1)
-    {
-        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page - 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">← Prev</a>
-    }
-    @if (Model.Page * Model.PageSize < Model.Total)
-    {
-        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page + 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">Next →</a>
-    }
+        <div class="tb-audit-top">
+            <div class="tb-audit-card">
+                <div class="tb-audit-card-title">Activity — last 30 days</div>
+                <div class="tb-audit-chart" id="tb-audit-chart-svg"></div>
+                <div class="tb-audit-chart-axis" id="tb-audit-chart-axis"></div>
+            </div>
+
+            <form method="get" action="@Url.Action("Index")" class="tb-audit-card tb-audit-filters">
+                <div class="tb-audit-card-title">Filters</div>
+                <div class="tb-audit-filters-row">
+                    <input type="search" name="search" class="tb-audit-search" value="@Model.Search"
+                           placeholder="Search action, actor, comment&#8230;" autocomplete="off" aria-label="Search">
+                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                </div>
+                <div class="tb-audit-filters-row">
+                    <select name="entityType" aria-label="Entity type">
+                        <option value="">All types</option>
+                        <option value="Template" @(Model.EntityType == "Template" ? "selected" : "")>Templates</option>
+                        <option value="Snippet" @(Model.EntityType == "Snippet" ? "selected" : "")>Snippets</option>
+                    </select>
+                    <select name="actionName" aria-label="Action">
+                        <option value="">All actions</option>
+                        @foreach (var action in Model.KnownActions)
+                        {
+                            <option value="@action" @(Model.Action == action ? "selected" : "")>@action</option>
+                        }
+                    </select>
+                    <input type="text" name="actor" value="@Model.Actor" placeholder="Actor" autocomplete="off" aria-label="Actor">
+                </div>
+                <div class="tb-audit-filters-row">
+                    <input type="date" name="from" value="@Model.From" aria-label="From date">
+                    <span style="color:var(--text-muted);font-size:12px;">to</span>
+                    <input type="date" name="to" value="@Model.To" aria-label="To date">
+                    <div class="tb-audit-filters-actions">
+                        <a class="btn btn-ghost btn-sm" href="@Url.Action("Index")">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="tb-audit-card tb-audit-table-card">
+            @if (Model.Rows.Count == 0)
+            {
+                <div class="tb-empty-state">
+                    <p>No audit events match your filters.</p>
+                    <a class="btn btn-primary" href="@Url.Action("Index")">Clear filters</a>
+                </div>
+            }
+            else
+            {
+                <div class="tb-audit-table-wrap">
+                    <table class="tb-audit-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>When</th>
+                                <th>Actor</th>
+                                <th>Action</th>
+                                <th>Target</th>
+                                <th>Comment</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in Model.Rows)
+                            {
+                                var hasState = !string.IsNullOrWhiteSpace(r.BeforeState) || !string.IsNullOrWhiteSpace(r.AfterState);
+                                <tr>
+                                    <td>
+                                        <button type="button" class="tb-audit-expand" id="audit-expand-@r.Id"
+                                                aria-expanded="false" aria-label="Show state changes" @(hasState ? "" : "disabled")>
+                                            &#9654;
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <span class="tb-audit-time" data-audit-time="@r.OccurredAt.ToLocalTime().ToString("s")">@r.OccurredAt.ToLocalTime().ToString("g")</span>
+                                        <span class="tb-audit-time-abs">@r.OccurredAt.ToLocalTime().ToString("ddd, MMM d yyyy, h:mm tt")</span>
+                                    </td>
+                                    <td>@r.Actor</td>
+                                    <td><span class="tb-action-badge tb-action-badge--@r.Action">@r.Action</span></td>
+                                    <td>
+                                        <span class="tb-audit-target">
+                                            <span class="tb-audit-entity-type">@r.EntityType</span>
+                                            @if (r.EntityType == "Template")
+                                            {
+                                                <a href="@Url.Action("Edit", "Templates", new { id = r.EntityId })">#@r.EntityId</a>
+                                            }
+                                            else
+                                            {
+                                                <text>#@r.EntityId</text>
+                                            }
+                                        </span>
+                                    </td>
+                                    <td>@r.Comment</td>
+                                </tr>
+                                if (hasState)
+                                {
+                                    <tr class="tb-audit-detail-row" id="audit-detail-@r.Id" hidden>
+                                        <td colspan="6">
+                                            <div class="tb-audit-detail">
+                                                <div class="tb-audit-detail-panel">
+                                                    <div class="tb-audit-detail-label">Before</div>
+                                                    <div data-role="before"></div>
+                                                </div>
+                                                <div class="tb-audit-detail-panel">
+                                                    <div class="tb-audit-detail-label">After</div>
+                                                    <div data-role="after"></div>
+                                                </div>
+                                            </div>
+                                            <script type="application/json" id="audit-state-@r.Id">@Html.Raw(Json.Encode(new { before = r.BeforeState, after = r.AfterState }))</script>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="tb-audit-pagination">
+                    <span class="tb-audit-pagination-info">Showing @firstShown&#8211;@lastShown of @Model.Total.ToString("N0")</span>
+                    <div class="tb-audit-pages">
+                        <a class="tb-page-link @(Model.Page <= 1 ? "disabled" : "")"
+                           href="@Url.Action("Index", new { page = Model.Page - 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })"
+                           aria-label="Previous page">&#8592;</a>
+                        @{
+                            var pageStart = System.Math.Max(1, Model.Page - 2);
+                            var pageEnd = System.Math.Min(pageCount, Model.Page + 2);
+                        }
+                        @if (pageStart > 1)
+                        {
+                            <a class="tb-page-link" href="@Url.Action("Index", new { page = 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">1</a>
+                            if (pageStart > 2)
+                            {
+                                <span class="tb-page-link disabled">&#8230;</span>
+                            }
+                        }
+                        @for (var p = pageStart; p <= pageEnd; p++)
+                        {
+                            <a class="tb-page-link @(p == Model.Page ? "current" : "")"
+                               href="@Url.Action("Index", new { page = p, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">@p</a>
+                        }
+                        @if (pageEnd < pageCount)
+                        {
+                            if (pageEnd < pageCount - 1)
+                            {
+                                <span class="tb-page-link disabled">&#8230;</span>
+                            }
+                            <a class="tb-page-link" href="@Url.Action("Index", new { page = pageCount, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">@pageCount</a>
+                        }
+                        <a class="tb-page-link @(Model.Page >= pageCount ? "disabled" : "")"
+                           href="@Url.Action("Index", new { page = Model.Page + 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })"
+                           aria-label="Next page">&#8594;</a>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <script type="application/json" id="tb-audit-initial-stats">@Html.Raw(Json.Encode(new {
+        total = stats.Total,
+        templateCount = stats.TemplateCount,
+        snippetCount = stats.SnippetCount,
+        uniqueActors = stats.UniqueActors,
+        buckets = stats.DailyBuckets.Select(b => new { date = b.Date.ToString("yyyy-MM-dd"), count = b.Count })
+    }))</script>
 </div>

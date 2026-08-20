@@ -1,3 +1,5 @@
+using TemplateBuilder.Infrastructure.EF6.Repositories;
+
 namespace TemplateBuilder.Editor.Mvc5.Models;
 
 public class AuditIndexViewModel
@@ -12,4 +14,6 @@ public class AuditIndexViewModel
     public string? From { get; set; }
     public string? To { get; set; }
     public string? Search { get; set; }
+    public AuditStats? Stats { get; set; }
+    public IReadOnlyList<string> KnownActions { get; set; } = new List<string>();
 }

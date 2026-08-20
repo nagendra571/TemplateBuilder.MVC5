@@ -14,6 +14,42 @@ function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Date/time formatting helpers (shared by activity drawer + audit page) ──────
+
+function fmtRelative(isoOrDate) {
+    const then = new Date(isoOrDate);
+    if (isNaN(then.getTime())) return '';
+    let diffMs = Date.now() - then.getTime();
+    if (diffMs < 0) diffMs = 0;
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days === 1) return 'yesterday';
+    if (days < 7) return `${days}d ago`;
+    return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function fmtDayLabel(isoOrDate) {
+    const d = new Date(isoOrDate);
+    if (isNaN(d.getTime())) return '';
+    const today = new Date();
+    const startOfDay = t => new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    const diffDays = Math.round((startOfDay(today) - startOfDay(d)) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function actionKind(action) {
+    if (action === 'published' || action === 'approved') return 'success';
+    if (action === 'rejected' || action === 'snippet_deleted') return 'danger';
+    if (['restored', 'snippet_restored', 'toggled_active', 'duplicated', 'review_cancelled'].includes(action)) return 'warning';
+    return 'info';
+}
+
 // ── Unsaved-change tracking ───────────────────────────────────────────────────
 
 let _isDirty = false;
@@ -2135,23 +2171,79 @@ document.getElementById('btn-publish')?.addEventListener('click', async () => {
     if (ok) { showToast('Published.'); markClean(); location.reload(); }
 });
 
-// Timeline
+// Activity drawer (Edit page)
+let _activityDrawerOpen = false;
+
+function openActivityDrawer() {
+    const drawer = document.getElementById('tb-activity-drawer');
+    const tab = document.getElementById('tb-activity-tab');
+    const closeBtn = document.getElementById('btn-activity-close');
+    if (!drawer) return;
+    drawer.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        drawer.classList.add('open');
+        if (tab) tab.classList.add('open');
+    }));
+    if (tab) tab.setAttribute('aria-expanded', 'true');
+    _activityDrawerOpen = true;
+    if (closeBtn) closeBtn.focus();
+}
+
+function closeActivityDrawer() {
+    const drawer = document.getElementById('tb-activity-drawer');
+    const tab = document.getElementById('tb-activity-tab');
+    if (!drawer || !_activityDrawerOpen) return;
+    _activityDrawerOpen = false;
+    drawer.classList.remove('open');
+    if (tab) {
+        tab.classList.remove('open');
+        tab.setAttribute('aria-expanded', 'false');
+    }
+    setTimeout(() => { if (!_activityDrawerOpen) drawer.hidden = true; }, 220);
+}
+
 async function loadTimeline() {
     const id = (typeof templateId !== 'undefined' ? templateId : (window.tbTemplateId || 0));
     if (id <= 0) return;
+    const tab = document.getElementById('tb-activity-tab');
+    const list = document.getElementById('tb-timeline');
+    if (!tab || !list) return;
+
     const res = await fetch(`/Templates/${id}/Audit`);
     if (!res.ok) return;
     const rows = await res.json();
-    const panel = document.getElementById('tb-timeline-panel');
-    const list = document.getElementById('tb-timeline');
-    if (!panel || !list || !rows.length) { if (panel) panel.hidden = true; return; }
-    panel.hidden = false;
-    list.innerHTML = rows.map(r => `
-        <div class="tb-timeline-item">
-            <span class="tb-timeline-action">${escapeHtml(r.action)}</span>
-            <span class="tb-timeline-meta">${escapeHtml(r.actor)} · ${new Date(r.occurredAt).toLocaleString()}</span>
-            ${r.comment ? `<div class="tb-timeline-comment">${escapeHtml(r.comment)}</div>` : ''}
+    if (!rows.length) { tab.hidden = true; return; }
+
+    tab.hidden = false;
+    const count = document.getElementById('tb-activity-count');
+    if (count) count.textContent = rows.length;
+
+    const groups = new Map();
+    rows.forEach(r => {
+        const key = new Date(r.occurredAt).toDateString();
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(r);
+    });
+
+    list.innerHTML = [...groups.entries()].map(([key, items]) => `
+        <div class="tb-timeline-group">
+            <div class="tb-timeline-group-label">${fmtDayLabel(key)}</div>
+            ${items.map(r => `
+                <div class="tb-timeline-item" data-kind="${actionKind(r.action)}">
+                    <span class="tb-timeline-action">${escapeHtml(r.action)}</span>
+                    <span class="tb-timeline-meta">${escapeHtml(r.actor)} · ${fmtRelative(r.occurredAt)}</span>
+                    ${r.comment ? `<div class="tb-timeline-comment">${escapeHtml(r.comment)}</div>` : ''}
+                </div>`).join('')}
         </div>`).join('');
+
+    tab.addEventListener('click', () => {
+        _activityDrawerOpen ? closeActivityDrawer() : openActivityDrawer();
+    });
+    const closeBtn = document.getElementById('btn-activity-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeActivityDrawer);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && _activityDrawerOpen) closeActivityDrawer();
+    });
 }
 
 updateWorkflowUI();
@@ -2571,4 +2663,180 @@ setTimeout(loadDraft, 500);
 
 // Initialize word count once SunEditor has rendered its content
 setTimeout(updateWordCount, 400);
+
+
+// ── Audit Log page ────────────────────────────────────────────────────────────
+
+(function initAuditPage() {
+    const page = document.querySelector('#tb-editor-host.tb-audit-page');
+    if (!page) return;
+
+    // Stats endpoint mirrors the current filters (minus pagination)
+    const params = new URLSearchParams(location.search);
+    params.delete('page');
+    const statsUrl = '/Audit/Stats?' + params.toString();
+
+    const initialTotal = parseInt(document.getElementById('tb-audit-total')?.getAttribute('data-total') || '0', 10);
+    const pill = document.getElementById('tb-live-pill');
+
+    // ── Relative timestamps ──
+    document.querySelectorAll('[data-audit-time]').forEach(el => {
+        el.textContent = fmtRelative(el.getAttribute('data-audit-time'));
+    });
+
+    // ── Expandable before/after state rows ──
+    function parseJson(text) {
+        if (!text) return null;
+        try { return JSON.parse(text); } catch { return null; }
+    }
+
+    function collectChangedPaths(a, b) {
+        const paths = new Set();
+        const walk = (x, y, prefix) => {
+            if (!x || !y || typeof x !== 'object' || typeof y !== 'object') return;
+            for (const k of Object.keys(x)) {
+                const full = prefix + k;
+                if (!(k in y)) { paths.add(full); continue; }
+                const xv = x[k], yv = y[k];
+                if (xv !== null && yv !== null && typeof xv === 'object' && typeof yv === 'object') {
+                    walk(xv, yv, full + '.');
+                } else if (JSON.stringify(xv) !== JSON.stringify(yv)) {
+                    paths.add(full);
+                }
+            }
+        };
+        walk(a, b, '');
+        return paths;
+    }
+
+    function annotateJson(jsonText, changedPaths) {
+        const lines = jsonText.split('\n');
+        const stack = [];
+        const out = [];
+        for (const line of lines) {
+            const indent = (line.match(/^\s*/) || [''])[0].length;
+            while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+            const m = line.match(/^\s*"([^"]+)"\s*:/);
+            let changed = false;
+            if (m) {
+                const parentPath = stack.length ? stack[stack.length - 1].path : '';
+                changed = changedPaths.has(parentPath + m[1]);
+                stack.push({ path: parentPath + m[1] + '.', indent });
+            }
+            out.push(changed ? `<span class="chg">${escapeHtml(line)}</span>` : escapeHtml(line));
+        }
+        return out.join('\n');
+    }
+
+    document.querySelectorAll('.tb-audit-detail-row').forEach(detailRow => {
+        const id = detailRow.id.replace('audit-detail-', '');
+        const toggle = document.getElementById(`audit-expand-${id}`);
+        const stateEl = document.getElementById(`audit-state-${id}`);
+        if (!toggle || !stateEl) { detailRow.remove(); return; }
+
+        let state = null;
+        try { state = JSON.parse(stateEl.textContent); } catch { state = null; }
+
+        const beforeObj = parseJson(state && state.before);
+        const afterObj = parseJson(state && state.after);
+
+        const beforeText = beforeObj ? JSON.stringify(beforeObj, null, 2) : (state && state.before ? state.before : null);
+        const afterText = afterObj ? JSON.stringify(afterObj, null, 2) : (state && state.after ? state.after : null);
+
+        if (!beforeText && !afterText) { toggle.disabled = true; return; }
+
+        let beforeHtml = '<span class="tb-audit-detail-empty">No previous state recorded</span>';
+        let afterHtml = '<span class="tb-audit-detail-empty">No state recorded</span>';
+
+        if (beforeObj && afterObj) {
+            const changed = collectChangedPaths(beforeObj, afterObj);
+            beforeHtml = `<pre class="tb-audit-detail-code">${annotateJson(beforeText, changed)}</pre>`;
+            afterHtml = `<pre class="tb-audit-detail-code">${annotateJson(afterText, changed)}</pre>`;
+        } else if (beforeObj) {
+            beforeHtml = `<pre class="tb-audit-detail-code">${escapeHtml(beforeText)}</pre>`;
+        } else if (afterObj) {
+            afterHtml = `<pre class="tb-audit-detail-code">${escapeHtml(afterText)}</pre>`;
+        } else if (beforeText || afterText) {
+            const differs = beforeText !== afterText;
+            const wrap = t => differs ? `<span class="chg">${escapeHtml(t)}</span>` : escapeHtml(t);
+            beforeHtml = beforeText ? `<pre class="tb-audit-detail-code">${wrap(beforeText)}</pre>` : beforeHtml;
+            afterHtml = afterText ? `<pre class="tb-audit-detail-code">${wrap(afterText)}</pre>` : afterHtml;
+        }
+
+        detailRow.querySelector('[data-role="before"]').innerHTML = beforeHtml;
+        detailRow.querySelector('[data-role="after"]').innerHTML = afterHtml;
+
+        toggle.addEventListener('click', () => {
+            const isOpen = !detailRow.hidden;
+            detailRow.hidden = isOpen;
+            toggle.classList.toggle('open', !isOpen);
+            toggle.setAttribute('aria-expanded', String(!isOpen));
+        });
+    });
+
+    // ── Activity chart (inline SVG, no external libs) ──
+    function renderChart(buckets) {
+        const svgHost = document.getElementById('tb-audit-chart-svg');
+        const axis = document.getElementById('tb-audit-chart-axis');
+        if (!svgHost || !buckets || !buckets.length) return;
+
+        const w = 560, h = 120, pad = 4;
+        const step = w / buckets.length;
+        const barW = Math.max(3, step - pad);
+        const max = Math.max(1, ...buckets.map(b => b.count));
+
+        const bars = buckets.map((b, i) => {
+            const bh = b.count > 0 ? Math.max(3, (b.count / max) * (h - 8)) : 1.5;
+            const x = i * step + (step - barW) / 2;
+            const y = h - bh;
+            return `<rect class="tb-chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5">` +
+                `<title>${b.date} — ${b.count} event${b.count === 1 ? '' : 's'}</title></rect>`;
+        }).join('');
+
+        svgHost.innerHTML = `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Audit events per day">${bars}</svg>`;
+        if (axis) {
+            const first = buckets[0].date.slice(5).replace('-', '/');
+            const mid = buckets[Math.floor(buckets.length / 2)].date.slice(5).replace('-', '/');
+            const last = buckets[buckets.length - 1].date.slice(5).replace('-', '/');
+            axis.innerHTML = `<span>${first}</span><span>${mid}</span><span>${last}</span>`;
+        }
+    }
+
+    function applyStats(s) {
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+        set('tb-audit-total', s.total.toLocaleString());
+        set('tb-stat-templates', s.templateCount.toLocaleString());
+        set('tb-stat-snippets', s.snippetCount.toLocaleString());
+        set('tb-stat-actors', s.uniqueActors.toLocaleString());
+        const range = document.getElementById('tb-stat-range');
+        if (range && s.buckets && s.buckets.length) {
+            range.textContent = `${s.buckets[0].date.slice(5).replace('-', '/')} – ${s.buckets[s.buckets.length - 1].date.slice(5).replace('-', '/')}`;
+        }
+        renderChart(s.buckets);
+    }
+
+    const initialStats = document.getElementById('tb-audit-initial-stats');
+    if (initialStats) {
+        try { applyStats(JSON.parse(initialStats.textContent)); } catch { /* leave server-rendered fallback */ }
+    }
+
+    // ── Live polling (30s) ──
+    setInterval(async () => {
+        try {
+            const res = await fetch(statsUrl, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) return;
+            const s = await res.json();
+            applyStats(s);
+            if (pill && s.total !== initialTotal) {
+                const delta = s.total - initialTotal;
+                pill.classList.add('tb-live-pill--updates');
+                pill.innerHTML = `<span class="tb-live-dot"></span> ${delta > 0 ? `${delta.toLocaleString()} new — Refresh` : 'Data changed — Refresh'}`;
+                pill.onclick = () => location.reload();
+            }
+        } catch { /* transient poll failures are silent */ }
+    }, 30000);
+})();
 

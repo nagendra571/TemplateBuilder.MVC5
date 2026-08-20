@@ -38,6 +38,7 @@ public static class UnityContainerExtensions
         container.RegisterType<ITemplateEngine, TemplateEngine>(new HierarchicalLifetimeManager());
         container.RegisterType<ISampleDataGenerator, SampleDataGenerator>(new HierarchicalLifetimeManager());
         container.RegisterType<IAuditRepository, AuditRepository>(new HierarchicalLifetimeManager());
+        container.RegisterType<IAuditStatsRepository, AuditStatsRepository>(new HierarchicalLifetimeManager());
         container.RegisterType<IAuditService, AuditService>(new ContainerControlledLifetimeManager());
         container.RegisterType<ITemplateWorkflowService, TemplateWorkflowService>(new HierarchicalLifetimeManager());
         container.RegisterInstance(new TemplateBuilderOptions());
