@@ -32,6 +32,54 @@ Documented environment adaptations (see BLOCKERS.md for full detail):
 | 13 | static CSS/JS HTTP 200 + content-type | PASS (2026-08-17 ~15:00 UTC): `curl http://localhost:8081/TemplateBuilderEditor/css/template-editor.css` → 200 `text/css` (7790 B); `/js/template-editor.js` → 200 `application/javascript` (11659 B); unknown path → 404. Assets reconstructed (origin wwwroot absent — BLOCKERS #1 pattern), embedded with explicit `LogicalName`s (verified via `GetManifestResourceNames`), served by `TemplateBuilderStaticAssetsRouteHandler`; `TemplateBuilderEditorRouteConfig.RegisterRoutes` now also enables `MapMvcAttributeRoutes()` in the sample host (Edit/Versions/_setup/layout-probe all 200). Commit after Task 12. | ✅ PASS | |
 | 14 | IIS Express + end-to-end flow | PASS (2026-08-17 ~16:00 UTC) on mono xsp4 (IIS Express is Windows-only — BLOCKERS #9; sample host runs under xsp4): full flow verified via curl — Home renders with editor links; `/Templates` list (shows updated name); form Create → 302 → `/Templates/4/Edit` (stock `[ValidateAntiForgeryToken]`); Edit GET shows `Invoice v3` + version label; SaveVersion JSON POST (cookie + `RequestVerificationToken` header) → `{"versionId":4,"versionNumber":3}`; Versions page lists v1–v4 with View/Restore; Restore/1/1 → new version; VersionBody; ToggleActive; Validate (400 empty / 200 valid); Preview (rendered HTML); Duplicate → `/Templates/3/Edit` 200; Snippets list/create/delete (204); `/_setup` 3× PASS; assets 200 with correct content types; sample host now has `_ViewStart` + `_Layout` wiring the editor CSS/JS (consumer pattern mirrored from origin RCL). Three package-level fixes made while proving the flow (all BLOCKERS #13/#14/#15): custom `ValidateJsonAntiForgeryTokenAttribute` (stock MVC5 antiforgery is form-only — header support is ASP.NET Core-only, would have failed on the client's Windows IIS too); mono stream-drain fix (`TemplateBuilderControllerBase.OnActionExecuting` drops the Form value provider for `application/json` — mono's `Request.Form` consumes the body during parameter binding); static-asset route no longer matches URL generation. Probe controller used for diagnosis removed before commit. | ✅ PASS | |
 | 15 | `dotnet pack` + nupkg extraction | PASS (2026-08-17 ~16:10 UTC): `dotnet pack -c Release -o ./nupkg` → `TemplateBuilder.Editor.Mvc5.1.0.0.nupkg`. Extracted and inspected: `lib/net48/` contains all 4 DLLs (Editor + Domain + Application + Infrastructure.EF6 via `BundleInternalAssemblies` target); `tools/install.ps1` (binding-redirect guidance for Newtonsoft.Json 13 + EF6 6.5.1) and root `README.md` present; NO `.cshtml` leakage; static assets confirmed embedded in the release DLL (`GetManifestResourceNames` → both `StaticAssets.*` names) alongside `TemplateBuilderStaticAssetsRoute` + `ValidateJsonAntiForgeryTokenAttribute` (MONO_PATH resolution check). nuspec dependencies correct (Mvc 5.3.0, Newtonsoft 13.0.3, RazorGenerator.Mvc 2.4.9, Unity 5.11.10, Unity.Mvc5 1.4.0). | ✅ PASS | |
+## 2026-08-20 — Audit page redesign + Activity drawer (Edit page)
+
+Design via brainstorming (visual companion mockups, 3 placement options) → user picked the
+slide-in drawer. Design approved before implementation.
+
+| # | Task | Evidence | Status |
+|---|---|---|---|
+| 1 | `IAuditStatsRepository` + `AuditStatsRepository` (daily buckets, by-type counts, unique actors) + shared `AuditFiltering` — TDD | RED (type missing) → GREEN 5/5 new tests; full EF6 suite 30/30 vs Docker SQL | ✅ PASS |
+| 2 | `GET /Audit/Stats` + `AuditIndexViewModel` extension + Unity registration | `/Audit/Stats` → `{"total":2,...,"buckets":[{date,count}×30]}`; build 0 errors (only pre-existing warnings) | ✅ PASS |
+| 3 | CSS: drawer section + full `.tb-audit-*` page (2006-line file) | Assets serve updated CSS (grep markers) | ✅ PASS |
+| 4 | JS: drawer (open/close/Esc/grouped timeline) + audit module (chart SVG, 30s poll, expand rows, relative time, JSON+string diff highlight) | `node --check` OK; agent-browser DOM assertions | ✅ PASS |
+| 5 | Views: Edit.cshtml drawer markup; Audit/Index.cshtml rewrite | RazorGenerator codegen regenerated (obj/CodeGen contains both views); sample host renders | ✅ PASS |
+| 6 | Layout regression (the original bug): 5-event drawer open vs closed | Grid 1264×591 unchanged; center panel 704×591; canvas intact; drawer overlays right edge 361×591 | ✅ PASS |
+| 7 | Audit page end-to-end | 5 stat chips, 30 bars + axis, badges per action, detail rows (JSON diff + "Draft"→"Review" string diff both show `.chg`), pagination "Showing 1–5", empty state on filtered-out query, 768px/375px: 3/2-col stats, no page h-scroll | ✅ PASS |
+| 8 | Repack → sample host reinstall → xbuild → xsp4 smoke | Fresh package install, xbuild clean, `/Audit` 200 (first boot 500 = EF init race, retried), `/Templates` 200, create→submit→approve flow via agent-browser | ✅ PASS |
+
+Environment notes learned this session (see MEMORY.md for detail): xsp4 restart needs
+`MONO_PATH` + `setsid`; sample host shares `TemplateBuilderMvc5Tests` with the EF6 suite (stop
+xsp4 before `dotnet test`); `pkill -f Mono.WebServer.XSP` self-kills the shell.
+
+## 2026-08-20 — Lifecycle & Ops (export/import, health check, bulk ops) — Tasks 1–11
+
+Session recovered mid-plan after an environment crash: Tasks 1–3 were already implemented but
+unverified; Tasks 4–11 executed in this session. All gates below run against the fresh state.
+
+| # | Task | Evidence | Status |
+|---|---|---|---|
+| 1 | Domain foundation (ExternalKey/SourceView/Snapshot, Imported, DeleteAsync, AddLifecycleOps migration + NEWID backfill) | EF6 suite incl. `TemplateLifecycleColumnsTests` 4/4; sqlcmd shows ExternalKey/SourceView/SourceViewSnapshot columns + unique index `IX_Templates_ExternalKey` in `TemplateBuilderMvc5Tests` | ✅ PASS |
+| 2 | ITemplatePromotionRepository + EF6 impl (AddWithVersions, AppendVersions, UpdateFromImport, GetByExternalKey) | EF6 `TemplatePromotionRepositoryTests` 3/3; full suite 37/37 | ✅ PASS |
+| 3 | Export document builder (camelCase JSON, SanitizeFileName) | Application `TemplatePromotionServiceTests` 3/3 | ✅ PASS |
+| 4 | Import orchestration (schema check, Scriban validation, locked-skip, status collapse, audit) | Application `TemplatePromotionImportTests` 9/9. Scriban probe: `Template.Parse` is lenient for unterminated `{{` (HasErrors=False) — the invalid-body test uses `{{ end }}` (real parse error) | ✅ PASS |
+| 5 | Bulk ZIP packaging (per-template files + `_summary.json`) | Application `TemplatePromotionBulkZipTests` 1/1; added `<Reference Include="System.IO.Compression" />` to Application + test csproj (net48 needs it) | ✅ PASS |
+| 6 | Health check engine (Scriban AST token extraction + snapshot drift) | Application `TemplateHealthServiceTests` 5/5. Adaptations: snapshot JSON shape is `{ takenAt, columns }` (BuildSnapshotJson shape, not a bare array); missing view = empty column list (SqlViewDiscoveryService never throws); this fork's Scriban-native `{{ for }}`/`{{ if }}` syntax (liquid `{% %}` parses as raw text) | ✅ PASS |
+| 7 | Controllers/endpoints/Unity (Export, Import, Bulk*, Health, HealthController, registration) | Editor build 0 errors; `AuditActions.Deleted` added (was absent). Smoke fix: `BulkIdsRequest.Ids` is `List<int>` — `int[]` = `Array.Empty` made MVC's DefaultModelBinder `ReplaceCollectionImpl` throw "Collection is read-only" on POST | ✅ PASS |
+| 8 | Views + CSS (bulk bar, health page, import modal, source-view select, health panel) | Codegen regenerated (`obj/CodeGen/Views/Health/Index.cshtml.cs` + `tb-bulk-bar`/`tb-health-panel` in Index/Edit codegen). Fix: import modal uses `.modal-overlay.open` class (the `hidden`-attribute plan variant would never display — overlay CSS is `.open`-driven) | ✅ PASS |
+| 9 | Editor JS modules (bulk, badges, import modal, editor health) | `node --check` OK. Fix: **Index.cshtml had an inline `const _csrf`** that collided with the external `template-editor.js` `const _csrf` — duplicate global declaration threw a SyntaxError that silently killed the whole external script on the list page (first page where external-JS features run); removed the inline declaration | ✅ PASS |
+| 10 | End-to-end (pack → sample host → xsp4 → curl + agent-browser) | Suites: Domain 20/20, Application 86/86, EF6 37/37. xsp4: create → `Export/1` attachment (camelCase JSON incl. versions) → `/Templates/1/Health` (tokens+findings) → `/Health` page (4 chips, finding rows) → `Summaries?ids=1` → BulkActivate/Deactivate `{"succeeded":[1]}` → BulkExport ZIP (`Lifecycle_Smoke.template.json` + `_summary.json`) → Import multipart: `updated ... versionsAppended:1`, then `skipped: Target is Review (locked)` after SubmitForReview → bound template to `v_HealthProbe` (SaveVersion + sourceView) → `ALTER VIEW` dropped Email + widened FirstName → health shows `column_missing` critical + `column_length_changed` warning → BulkDelete removes rows, `/Audit` shows deleted/toggled_active/imported records. agent-browser: health badges populate (2 issues / 1 warning), bulk toolbar count, deactivate→rows Inactive, activate→Active, import modal open/close, editor Source View select + Health button panel, screenshots `/tmp/opencode/lifecycle-*.png`. xsp source was wiped by the crash — rebuilt from mono/xsp@72b24c0 (AssemblyInfo from `.in`, SignAssembly=false) | ✅ PASS |
+| 11 | Docs + memory | README features table + new **Lifecycle & Ops** section; PROGRESS gate table; MEMORY.md entries | ✅ PASS |
+
+Plan deviations worth knowing (also in MEMORY.md):
+- Mono test-host crash (the "sudden logout"): `dotnet test` for net48 spawns a mono test host
+  that can hard-crash the whole session (`mono_crash.*.json` dumps). A re-run passes; the
+  previous session died on exactly this during Task 3 verification — no work was lost.
+- The plan's liquid-style `{% for %}` test bodies were switched to Scriban-native `{{ for }}` —
+  this fork (like the origin editor) uses Scriban-native block syntax; `{% %}` parses as raw text.
+- Commits: skipped per repo rule (only commit when explicitly asked). All lifecycle-ops files
+  are uncommitted; see `git status` for the full list.
+
 ## Final verification checklist (2026-08-17)
 
 - [x] `dotnet build TemplateBuilder.Mvc5.sln` — zero errors

@@ -241,6 +241,15 @@ Every failing check shows a one-line fix.
 | Template audit timeline | `GET /Templates/{id}/Audit` |
 | Global audit log | `GET /Audit` |
 | Audit CSV export | `GET /Audit/Export` |
+| Export template (JSON incl. versions) | `GET /Templates/Export/{id}` |
+| Import template export file | `POST /Templates/Import` |
+| Bulk activate | `POST /Templates/BulkActivate` |
+| Bulk deactivate | `POST /Templates/BulkDeactivate` |
+| Bulk export ZIP | `POST /Templates/BulkExport` |
+| Bulk delete | `POST /Templates/BulkDelete` |
+| Template health check | `GET /Templates/{id}/Health` |
+| Health overview page | `GET /Health` |
+| Health summaries (badges) | `GET /Health/Summaries?ids=1,2` |
 | Setup check | `GET /Templates/_setup` *(debug only)* |
 
 ---
@@ -276,6 +285,27 @@ Every meaningful action — workflow transitions, draft saves (throttled to at m
 - Snippets have **version history and usage tracking**. An edit that changes the body creates a new version; metadata-only edits do not. `GET /Templates/Api/Snippets/{id}/Versions` lists history, and `POST /Templates/Api/Snippets/{id}/Restore/{versionId}` restores a version — a restore itself creates a new version, so no state is lost. (The initial body is captured as v1 on the first body change; a never-edited snippet has no version rows yet.)
 - Concurrent snippet edits are rejected with `409` via a row-version concurrency token.
 - Inserting a snippet into a template records usage — `POST /Templates/Api/Snippets/{id}/Usage?templateId={id}` — and the snippet list shows "used Nx in M templates".
+
+---
+
+## Lifecycle & Ops
+
+### Export / import (dev → prod promotion)
+
+- **Export** — `GET /Templates/Export/{id}` downloads a camelCase JSON document (`schemaVersion: 1`) containing the template metadata, its `externalKey` (a stable GUID identity assigned at creation), and the full ordered version history. The list page has an **Export** row action; `POST /Templates/BulkExport` packages multiple templates into a ZIP with a `_summary.json` manifest.
+- **Import** — `POST /Templates/Import` (multipart file upload) matches by `externalKey`: templates with a matching key in the target environment get their metadata updated and their versions appended (continuing from the target's next version number); new keys create new templates with original version numbers preserved. **Locked targets are never clobbered** — Review/Approved templates are skipped. Exported Review/Approved statuses collapse to Draft on import, so promotion always requires a local review/approval pass.
+- The import modal on the list page renders per-entry results (created / updated with "N versions appended" / skipped / errors).
+- `SourceView`/`SourceViewSnapshot` are deliberately **not** exported — they are environment-local schema expectations, not part of the template.
+
+### Template health check (field drift vs live schema)
+
+- Bind a template to a SQL view via the **Source SQL View** select in the editor's Properties panel (saving refreshes a stored snapshot of that view's columns).
+- `GET /Templates/{id}/Health` (and the editor's **Health** button) compares the template's Scriban `model.*` paths against the live view schema and reports findings: `column_missing` (Critical), `column_type_changed` / `column_length_changed` / `column_nullability_changed` (Warning, from the snapshot), `view_missing` (Critical), and `unbound_tokens` (Warning, template uses model fields but no view is bound).
+- `GET /Health` is the overview page (Healthy / Warnings / Critical / Unbound stat chips and a per-template finding table); the list page's health badges poll `GET /Health/Summaries?ids=…`.
+
+### Bulk operations
+
+- The list page's row checkboxes reveal a bulk toolbar: **Activate**, **Deactivate**, **Export ZIP**, **Delete** (with confirmation; version history is removed, audit rows remain), and **Clear**. Each endpoint returns `{ succeeded, failed }` so partial failures are visible.
 
 ---
 
