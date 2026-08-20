@@ -381,7 +381,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     public async Task<ActionResult> GetAuditTimeline(int id)
     {
         var rows = await _auditRepository.QueryAsync(new AuditQuery { EntityType = "Template", EntityId = id, PageSize = 100 });
-        return JsonOk(rows.Select(a => new { a.Id, a.Action, a.Actor, a.OccurredAt, a.Comment }));
+        return JsonOk(rows.Select(a => new { id = a.Id, action = a.Action, actor = a.Actor, occurredAt = a.OccurredAt, comment = a.Comment }));
     }
 
     private async Task<ActionResult> RunWorkflow(Func<Task<TemplateWorkflowResult>> action)

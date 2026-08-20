@@ -1489,3 +1489,54 @@
 #tb-editor-host .tb-ref-item-label { font-size: 13px; font-weight: 600; }
 #tb-editor-host .tb-ref-item-code { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
 #tb-editor-host .tb-ref-item-output { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+
+/* ── 33. Governance — status pill, lock banner, workflow actions, timeline ─── */
+
+#tb-editor-host .tb-status-pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+#tb-editor-host .tb-status-pill[data-status="Draft"]     { background:#33507a; color:#cfe0ff; }
+#tb-editor-host .tb-status-pill[data-status="Review"]    { background:#7a5c2a; color:#ffe2b0; }
+#tb-editor-host .tb-status-pill[data-status="Approved"]  { background:#2a6a4a; color:#c0ffdd; }
+#tb-editor-host .tb-status-pill[data-status="Published"] { background:#2a6a4a; color:#c0ffdd; }
+#tb-editor-host .tb-banner { border-radius:6px; padding:8px 12px; font-size:13px; margin:8px 0; }
+#tb-editor-host .tb-banner--lock { background:#3a2a10; border:1px solid #e8a13c; color:#e8c07a; }
+#tb-editor-host .tb-banner--info { background:#10243e; border:1px solid #2a5a8a; color:#bcd8f5; }
+#tb-editor-host .tb-editor-locked { pointer-events:none; opacity:.7; }
+#tb-editor-host .tb-workflow-actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+#tb-editor-host .tb-timeline { display:flex; flex-direction:column; gap:8px; padding-left:4px; }
+#tb-editor-host .tb-timeline-item { border-left:2px solid #24406e; padding-left:10px; }
+#tb-editor-host .tb-timeline-action { font-weight:600; color:#dbe6ff; display:block; }
+#tb-editor-host .tb-timeline-meta { font-size:11px; color:#6f84a8; }
+#tb-editor-host .tb-timeline-comment { font-size:12px; color:#e8c07a; font-style:italic; }
+#tb-editor-host .tb-snippet-meta { font-size:11px; color:#6f84a8; display:block; }
+
+/* Hidden-state overrides (display:flex/block would otherwise defeat [hidden]) */
+#tb-editor-host .tb-workflow-actions[hidden],
+#tb-editor-host .tb-banner[hidden],
+#tb-editor-host .tb-timeline-panel[hidden] { display: none; }
+
+/* Timeline panel container in the right sidebar */
+#tb-editor-host .tb-panel { padding:14px; border-top:1px solid var(--border); }
+#tb-editor-host .tb-panel-title {
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--text-muted); margin:0 0 10px;
+}
+
+/* Approve button (workflow group) */
+#tb-editor-host .btn-success {
+    background: var(--success-bg); color: var(--success); border-color: var(--success-border);
+}
+#tb-editor-host .btn-success:hover:not(:disabled) { filter: brightness(.92); }
+
+/* Snippet edit/history actions + usage meta layout */
+#tb-editor-host .tb-snippet-item { flex-wrap: wrap; }
+#tb-editor-host .tb-snippet-meta { flex-basis: 100%; }
+#tb-editor-host .tb-snippet-edit,
+#tb-editor-host .tb-snippet-history {
+    font-size:11px; font-weight:600; padding:2px 8px;
+    background:var(--surface2); color:var(--text-secondary);
+    border:none; border-radius:4px; cursor:pointer; font-family:inherit;
+    transition:background var(--transition), color var(--transition);
+    flex-shrink:0;
+}
+#tb-editor-host .tb-snippet-edit:hover,
+#tb-editor-host .tb-snippet-history:hover { background:var(--accent); color:#fff; }

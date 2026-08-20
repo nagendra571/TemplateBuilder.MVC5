@@ -17,7 +17,11 @@ function escapeHtml(str) {
 // ── Unsaved-change tracking ───────────────────────────────────────────────────
 
 let _isDirty = false;
-function markDirty() { _isDirty = true; }
+function markDirty() {
+    const st = window.tbStatus;
+    if (st === 'Review' || st === 'Approved') return;
+    _isDirty = true;
+}
 function markClean() { _isDirty = false; }
 
 let _currentColumns = [];
@@ -667,7 +671,7 @@ document.getElementById('btn-create-submit')?.addEventListener('click', createTe
 // ── Save version ──────────────────────────────────────────────────────────────
 
 async function saveVersion() {
-    const btn = document.getElementById('btn-save');
+    const btn = document.getElementById('btn-save-version');
     const errorEl = document.getElementById('save-error');
     errorEl.style.display = 'none';
     btn.disabled = true;
@@ -1632,7 +1636,7 @@ function updateWordCount() {
 document.getElementById('view-selector')?.addEventListener('change', e => loadViewColumns(e.target.value));
 document.getElementById('btn-history')?.addEventListener('click', openVersionHistory);
 document.getElementById('btn-preview')?.addEventListener('click', openPreview);
-document.getElementById('btn-save')?.addEventListener('click', saveVersion);
+document.getElementById('btn-save-version')?.addEventListener('click', saveVersion);
 document.getElementById('btn-render')?.addEventListener('click', renderPreview);
 document.getElementById('btn-gen-sample')?.addEventListener('click', () => {
     const ta = document.getElementById('preview-json');
@@ -1771,10 +1775,14 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
 
 (function wireSnippets() {
     let _pendingSnippetBody = '';
+    let _editingSnippetId = null;
+    let _historySnippetId = null;
+    let _snippets = [];
 
     // ── Render ───────────────────────────────────────────────────────────────
 
     function renderSnippets(snippets) {
+        _snippets = snippets;
         const list = document.getElementById('snippet-list');
         if (!list) return;
         if (!snippets.length) {
@@ -1784,8 +1792,11 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
         list.innerHTML = snippets.map(s => `
             <div class="tb-snippet-item">
                 <span class="tb-snippet-name" title="${escapeHtml(s.description || s.name)}">${escapeHtml(s.name)}</span>
+                <span class="tb-snippet-meta">used ${s.usageCount ?? 0}x in ${s.templateCount ?? 0} templates</span>
                 <div class="tb-snippet-actions">
                     <button type="button" class="tb-snippet-insert" data-snippet-id="${s.id}" aria-label="Insert ${escapeHtml(s.name)}">Insert</button>
+                    <button type="button" class="tb-snippet-edit" data-snippet-id="${s.id}" aria-label="Edit ${escapeHtml(s.name)}">Edit</button>
+                    <button type="button" class="tb-snippet-history" data-snippet-id="${s.id}" aria-label="History ${escapeHtml(s.name)}">History</button>
                     <button type="button" class="tb-snippet-delete" data-snippet-id="${s.id}" aria-label="Delete ${escapeHtml(s.name)}">✕</button>
                 </div>
             </div>`).join('');
@@ -1808,6 +1819,7 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
     // ── Save ─────────────────────────────────────────────────────────────────
 
     function openSaveSnippetModal() {
+        _editingSnippetId = null;
         // Capture selection HTML while focus is still in the editor
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
@@ -1832,6 +1844,70 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
         document.getElementById('snippet-name').focus();
     }
 
+    function openEditSnippetModal(id) {
+        const snippet = _snippets.find(s => s.id === id);
+        if (!snippet) { showToast('Snippet not found'); return; }
+        _editingSnippetId = id;
+        document.getElementById('snippet-name').value = snippet.name;
+        document.getElementById('snippet-desc').value = snippet.description || '';
+        document.getElementById('snippet-error').style.display = 'none';
+        const modal = document.getElementById('save-snippet-modal');
+        modal.classList.add('open');
+        trapFocus(modal);
+        document.getElementById('snippet-name').focus();
+    }
+
+    async function openSnippetHistory(id) {
+        _historySnippetId = id;
+        const modal = document.getElementById('versions-modal');
+        const content = document.getElementById('snippet-versions-content');
+        content.innerHTML = 'Loading…';
+        modal.classList.add('open');
+        trapFocus(modal);
+        try {
+            const res = await fetch(`/Templates/Api/Snippets/${id}/Versions`);
+            if (!res.ok) {
+                content.innerHTML = '<p style="color:var(--danger)">Failed to load snippet history.</p>';
+                return;
+            }
+            const versions = await res.json();
+            if (!versions.length) {
+                content.innerHTML = '<p class="tb-palette-msg">No versions yet.</p>';
+                return;
+            }
+            content.innerHTML = versions.map(v => `
+                <div class="tb-version-card">
+                    <div class="tb-version-header">
+                        <span class="tb-version-num">v${v.versionNumber}</span>
+                        <button type="button" class="btn btn-sm btn-primary" data-restore-version="${v.id}">Restore</button>
+                    </div>
+                    ${v.changeComment ? `<div class="tb-version-comment">${escapeHtml(v.changeComment)}</div>` : ''}
+                    <div class="tb-version-meta">${escapeHtml(v.createdBy || '')} · ${new Date(v.createdAt).toLocaleString()}</div>
+                </div>`).join('');
+        } catch {
+            content.innerHTML = '<p style="color:var(--danger)">Network error loading snippet history.</p>';
+        }
+    }
+
+    async function restoreSnippetVersion(versionId) {
+        try {
+            const res = await fetch(`/Templates/Api/Snippets/${_historySnippetId}/Restore/${versionId}`, {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': _csrf }
+            });
+            if (res.ok) {
+                closeModal('versions-modal');
+                showToast('Snippet version restored');
+                await loadSnippets();
+            } else {
+                const err = await res.json().catch(() => null);
+                showToast(err?.message || 'Failed to restore snippet version');
+            }
+        } catch {
+            showToast('Network error — please try again');
+        }
+    }
+
     async function saveSnippet() {
         const nameEl  = document.getElementById('snippet-name');
         const descEl  = document.getElementById('snippet-desc');
@@ -1848,20 +1924,45 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
         }
 
         saveBtn.disabled = true;
+        const editingId = _editingSnippetId;
         try {
-            const res = await fetch('/Templates/Api/Snippets', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
-                body: JSON.stringify({ name, description: descEl.value.trim() || null, body: _pendingSnippetBody })
-            });
-            if (res.ok) {
-                closeModal('save-snippet-modal');
-                showToast(`Snippet "${name}" saved`);
-                await loadSnippets();
+            if (editingId) {
+                const snippet = _snippets.find(s => s.id === editingId);
+                const res = await fetch(`/Templates/Api/Snippets/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+                    body: JSON.stringify({
+                        name,
+                        description: descEl.value.trim() || null,
+                        body: snippet?.body ?? '',
+                        changeComment: ''
+                    })
+                });
+                if (res.ok) {
+                    _editingSnippetId = null;
+                    closeModal('save-snippet-modal');
+                    showToast(`Snippet "${name}" updated`);
+                    await loadSnippets();
+                } else {
+                    const data = await res.json().catch(() => null);
+                    errorEl.textContent = data?.message ?? 'Failed to update snippet.';
+                    errorEl.style.display = 'block';
+                }
             } else {
-                const data = await res.json().catch(() => null);
-                errorEl.textContent = data?.message ?? 'Failed to save snippet.';
-                errorEl.style.display = 'block';
+                const res = await fetch('/Templates/Api/Snippets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+                    body: JSON.stringify({ name, description: descEl.value.trim() || null, body: _pendingSnippetBody })
+                });
+                if (res.ok) {
+                    closeModal('save-snippet-modal');
+                    showToast(`Snippet "${name}" saved`);
+                    await loadSnippets();
+                } else {
+                    const data = await res.json().catch(() => null);
+                    errorEl.textContent = data?.message ?? 'Failed to save snippet.';
+                    errorEl.style.display = 'block';
+                }
             }
         } catch {
             errorEl.textContent = 'Network error — please try again.';
@@ -1893,9 +1994,11 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
 
     // ── Event wiring ──────────────────────────────────────────────────────────
 
-    // Insert / Delete via event delegation on snippet list
+    // Insert / Delete / Edit / History via event delegation on snippet list
     document.getElementById('snippet-list')?.addEventListener('click', async e => {
         const insertBtn = e.target.closest('.tb-snippet-insert');
+        const editBtn = e.target.closest('.tb-snippet-edit');
+        const historyBtn = e.target.closest('.tb-snippet-history');
         const deleteBtn = e.target.closest('.tb-snippet-delete');
         if (insertBtn) {
             const id = Number(insertBtn.dataset.snippetId);
@@ -1907,10 +2010,22 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
                     _editor.insertHTML(snippet.body);
                     document.querySelector('.sun-editor-editable')?.focus();
                     markDirty();
+                    if (templateId !== null) {
+                        fetch(`/Templates/Api/Snippets/${id}/Usage?templateId=${templateId}`, {
+                            method: 'POST', headers: { 'RequestVerificationToken': _csrf }
+                        }).catch(() => {});
+                    }
                 }
             } catch { showToast('Failed to insert snippet'); }
         }
+        if (editBtn) openEditSnippetModal(Number(editBtn.dataset.snippetId));
+        if (historyBtn) openSnippetHistory(Number(historyBtn.dataset.snippetId));
         if (deleteBtn) await deleteSnippet(Number(deleteBtn.dataset.snippetId));
+    });
+
+    document.getElementById('snippet-versions-content')?.addEventListener('click', e => {
+        const btn = e.target.closest('[data-restore-version]');
+        if (btn) restoreSnippetVersion(Number(btn.dataset.restoreVersion));
     });
 
     // Save-snippet modal buttons
@@ -1926,6 +2041,113 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
     // Load snippets on page init
     loadSnippets();
 })();
+
+// ── Workflow ────────────────────────────────────────────────────────────────
+const tbStatus = window.tbStatus || 'Draft';
+const isLocked = tbStatus === 'Review' || tbStatus === 'Approved';
+
+function updateWorkflowUI() {
+    const group = document.getElementById('tb-workflow-actions');
+    if (!group) return;
+    group.hidden = window.tbIsCreate;
+    group.dataset.status = tbStatus;
+    document.getElementById('btn-submit-review')?.toggleAttribute('hidden', tbStatus !== 'Draft');
+    document.getElementById('btn-approve')?.toggleAttribute('hidden', tbStatus !== 'Review');
+    document.getElementById('btn-reject')?.toggleAttribute('hidden', tbStatus !== 'Review');
+    document.getElementById('btn-cancel-review')?.toggleAttribute('hidden', !(tbStatus === 'Review' || tbStatus === 'Approved'));
+    document.getElementById('btn-publish')?.toggleAttribute('hidden', tbStatus !== 'Approved');
+
+    const pill = document.getElementById('tb-status-pill');
+    if (pill) { pill.dataset.status = tbStatus; pill.textContent = tbStatus; }
+
+    const banner = document.getElementById('tb-lock-banner');
+    const comment = document.getElementById('tb-review-comment');
+    if (isLocked) {
+        if (banner) {
+            banner.hidden = false;
+            banner.textContent = tbStatus === 'Review'
+                ? 'This template is under review — editing is locked until it is approved or rejected.'
+                : 'This template is approved — editing is locked. Publish to make it live.';
+        }
+        if (comment && window.tbReviewComment) {
+            comment.hidden = false;
+            comment.textContent = 'Review feedback: ' + window.tbReviewComment;
+        }
+        if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(true);
+        else document.querySelector('.sun-editor')?.classList.add('tb-editor-locked');
+    } else {
+        if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(false);
+        else document.querySelector('.sun-editor')?.classList.remove('tb-editor-locked');
+    }
+    document.getElementById('btn-create-submit')?.toggleAttribute('hidden', !window.tbIsCreate || isLocked);
+    document.getElementById('btn-save-version')?.toggleAttribute('hidden', isLocked);
+    document.getElementById('btn-preview')?.toggleAttribute('hidden', isLocked);
+}
+
+async function workflowFetch(url, body) {
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+        body: body ? JSON.stringify(body) : undefined
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.message || 'Action failed');
+        return null;
+    }
+    return res.json();
+}
+
+document.getElementById('btn-submit-review')?.addEventListener('click', async () => {
+    const body = _editor?.getContents() ?? '';
+    if (!body.trim()) { showToast('Template body is empty.'); return; }
+    const ok = await workflowFetch(`/Templates/${templateId}/SubmitForReview`, { body });
+    if (ok) { showToast('Submitted for review.'); location.reload(); }
+});
+
+document.getElementById('btn-approve')?.addEventListener('click', async () => {
+    const ok = await workflowFetch(`/Templates/${templateId}/Approve`);
+    if (ok) { showToast('Approved — ready to publish.'); location.reload(); }
+});
+
+document.getElementById('btn-reject')?.addEventListener('click', async () => {
+    const comment = prompt('Rejection feedback (optional):');
+    if (comment === null) return;
+    const ok = await workflowFetch(`/Templates/${templateId}/Reject`, { comment });
+    if (ok) { showToast('Rejected — template returned to draft.'); location.reload(); }
+});
+
+document.getElementById('btn-cancel-review')?.addEventListener('click', async () => {
+    const ok = await workflowFetch(`/Templates/${templateId}/CancelReview`);
+    if (ok) { showToast('Review cancelled — editing unlocked.'); location.reload(); }
+});
+
+document.getElementById('btn-publish')?.addEventListener('click', async () => {
+    if (!confirm('Publish the approved body as a new version?')) return;
+    const ok = await workflowFetch(`/Templates/${templateId}/Publish`);
+    if (ok) { showToast('Published.'); location.reload(); }
+});
+
+// Timeline
+async function loadTimeline() {
+    if (templateId === null) return;
+    const res = await fetch(`/Templates/${templateId}/Audit`);
+    if (!res.ok) return;
+    const rows = await res.json();
+    const panel = document.getElementById('tb-timeline-panel');
+    const list = document.getElementById('tb-timeline');
+    if (!panel || !list || !rows.length) { if (panel) panel.hidden = true; return; }
+    panel.hidden = false;
+    list.innerHTML = rows.map(r => `
+        <div class="tb-timeline-item">
+            <span class="tb-timeline-action">${escapeHtml(r.action)}</span>
+            <span class="tb-timeline-meta">${escapeHtml(r.actor)} · ${new Date(r.occurredAt).toLocaleString()}</span>
+            ${r.comment ? `<div class="tb-timeline-comment">${escapeHtml(r.comment)}</div>` : ''}
+        </div>`).join('');
+}
+
+updateWorkflowUI();
+loadTimeline();
 
 // ── Special characters picker ─────────────────────────────────────────────────
 
@@ -2237,7 +2459,7 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
     window._isFindReplaceOpen = () => !panel.hidden;
 })();
 
-// ── Auto-save draft (localStorage only — no server writes) ───────────────────
+// ── Auto-save draft (server-first; localStorage kept as crash-recovery cache) ─
 
 const DRAFT_KEY         = `tb-draft-${templateId}`;
 const AUTOSAVE_PREF_KEY = 'tb-autosave-enabled';
@@ -2275,17 +2497,25 @@ function clearDraft() {
     if (el) el.textContent = '';
 }
 
-function saveDraft() {
+async function saveDraft() {
     if (!_isDirty || !isAutoSaveEnabled() || !_editor) return;
+    const body = _editor.getContents();
+    const sampleData = document.getElementById('preview-json')?.value ?? null;
     try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({
-            body: _editor.getContents(),
-            sampleData: document.getElementById('preview-json')?.value ?? null,
-            timestamp: Date.now(),
-            versionNumber: currentVersionNumber
-        }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ body, sampleData, timestamp: Date.now(), versionNumber: currentVersionNumber }));
         updateDraftStatus();
-    } catch { /* storage quota exceeded — silently skip */ }
+        if (templateId !== null && tbStatus !== 'Review' && tbStatus !== 'Approved') {
+            const res = await fetch(`/Templates/${templateId}/Draft`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+                body: JSON.stringify({ body })
+            });
+            if (!res.ok && res.status !== 409) {
+                const err = await res.json().catch(() => ({}));
+                console.warn('Draft save failed:', err.message || res.status);
+            }
+        }
+    } catch { /* storage or network failure — silently skip */ }
 }
 
 function loadDraft() {

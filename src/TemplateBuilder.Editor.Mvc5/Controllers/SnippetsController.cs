@@ -26,7 +26,21 @@ public class SnippetsController : TemplateBuilderControllerBase
     public async Task<ActionResult> GetAll()
     {
         var snippets = await _snippets.GetAllAsync();
-        return JsonOk(snippets.Select(s => new { s.Id, s.Name, s.Description, s.Body }));
+        var stats = (await _snippets.GetUsageStatsAsync()).ToDictionary(x => x.SnippetId, x => x);
+        return JsonOk(snippets.Select(s =>
+        {
+            stats.TryGetValue(s.Id, out var st);
+            return new
+            {
+                id = s.Id,
+                name = s.Name,
+                description = s.Description,
+                body = s.Body,
+                usageCount = st?.UsageCount ?? 0,
+                templateCount = st?.TemplateCount ?? 0,
+                lastUsedAt = st?.LastUsedAt
+            };
+        }));
     }
 
     [Route("Templates/Api/Snippets")]
@@ -98,7 +112,7 @@ public class SnippetsController : TemplateBuilderControllerBase
     public async Task<ActionResult> GetVersions(int id)
     {
         var versions = await _snippets.GetVersionHistoryAsync(id);
-        return JsonOk(versions.Select(v => new { v.Id, v.VersionNumber, v.Body, v.ChangeComment, v.CreatedAt, v.CreatedBy }));
+        return JsonOk(versions.Select(v => new { id = v.Id, versionNumber = v.VersionNumber, body = v.Body, changeComment = v.ChangeComment, createdAt = v.CreatedAt, createdBy = v.CreatedBy }));
     }
 
     [Route("Templates/Api/Snippets/{id:int}/Restore/{versionId:int}")]

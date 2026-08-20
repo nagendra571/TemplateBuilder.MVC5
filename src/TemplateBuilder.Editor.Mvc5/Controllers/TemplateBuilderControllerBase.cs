@@ -1,4 +1,5 @@
 using System.Web.Mvc;
+using TemplateBuilder.Editor.Mvc5.Models;
 
 namespace TemplateBuilder.Editor.Mvc5.Controllers;
 
@@ -24,7 +25,10 @@ public abstract class TemplateBuilderControllerBase : Controller
     protected ActionResult JsonError(int statusCode, object errorBody)
     {
         Response.StatusCode = statusCode;
-        return Json(errorBody, JsonRequestBehavior.AllowGet);
+        var body = errorBody is ErrorResult e
+            ? (object)new { code = e.Code, message = e.Message }
+            : errorBody;
+        return Json(body, JsonRequestBehavior.AllowGet);
     }
 
     protected ActionResult NoContentResult() => new HttpStatusCodeResult(204);
