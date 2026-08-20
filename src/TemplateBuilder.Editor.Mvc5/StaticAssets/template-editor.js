@@ -2010,7 +2010,7 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
                     _editor.insertHTML(snippet.body);
                     document.querySelector('.sun-editor-editable')?.focus();
                     markDirty();
-                    if (templateId !== null) {
+                    if (templateId > 0) {
                         fetch(`/Templates/Api/Snippets/${id}/Usage?templateId=${templateId}`, {
                             method: 'POST', headers: { 'RequestVerificationToken': _csrf }
                         }).catch(() => {});
@@ -2102,35 +2102,35 @@ document.getElementById('btn-submit-review')?.addEventListener('click', async ()
     const body = _editor?.getContents() ?? '';
     if (!body.trim()) { showToast('Template body is empty.'); return; }
     const ok = await workflowFetch(`/Templates/${templateId}/SubmitForReview`, { body });
-    if (ok) { showToast('Submitted for review.'); location.reload(); }
+    if (ok) { showToast('Submitted for review.'); markClean(); location.reload(); }
 });
 
 document.getElementById('btn-approve')?.addEventListener('click', async () => {
     const ok = await workflowFetch(`/Templates/${templateId}/Approve`);
-    if (ok) { showToast('Approved — ready to publish.'); location.reload(); }
+    if (ok) { showToast('Approved — ready to publish.'); markClean(); location.reload(); }
 });
 
 document.getElementById('btn-reject')?.addEventListener('click', async () => {
     const comment = prompt('Rejection feedback (optional):');
     if (comment === null) return;
     const ok = await workflowFetch(`/Templates/${templateId}/Reject`, { comment });
-    if (ok) { showToast('Rejected — template returned to draft.'); location.reload(); }
+    if (ok) { showToast('Rejected — template returned to draft.'); markClean(); location.reload(); }
 });
 
 document.getElementById('btn-cancel-review')?.addEventListener('click', async () => {
     const ok = await workflowFetch(`/Templates/${templateId}/CancelReview`);
-    if (ok) { showToast('Review cancelled — editing unlocked.'); location.reload(); }
+    if (ok) { showToast('Review cancelled — editing unlocked.'); markClean(); location.reload(); }
 });
 
 document.getElementById('btn-publish')?.addEventListener('click', async () => {
     if (!confirm('Publish the approved body as a new version?')) return;
     const ok = await workflowFetch(`/Templates/${templateId}/Publish`);
-    if (ok) { showToast('Published.'); location.reload(); }
+    if (ok) { showToast('Published.'); markClean(); location.reload(); }
 });
 
 // Timeline
 async function loadTimeline() {
-    if (templateId === null) return;
+    if (templateId <= 0) return;
     const res = await fetch(`/Templates/${templateId}/Audit`);
     if (!res.ok) return;
     const rows = await res.json();
@@ -2504,7 +2504,7 @@ async function saveDraft() {
     try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({ body, sampleData, timestamp: Date.now(), versionNumber: currentVersionNumber }));
         updateDraftStatus();
-        if (templateId !== null && tbStatus !== 'Review' && tbStatus !== 'Approved') {
+        if (templateId > 0 && tbStatus !== 'Review' && tbStatus !== 'Approved') {
             const res = await fetch(`/Templates/${templateId}/Draft`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
