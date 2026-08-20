@@ -194,6 +194,7 @@ const specialCharsPlugin = {
 
 const _canvasEl = document.getElementById('template-body');
 if (_canvasEl) {
+function handleEditorChange() { markDirty(); updateWordCount(); refreshUsedMarks(); }
 _editor = SUNEDITOR.create(_canvasEl, {
     plugins: [
         blockquotePlugin,
@@ -250,7 +251,7 @@ _editor = SUNEDITOR.create(_canvasEl, {
         th:    'style|class|contenteditable|colspan|rowspan',
         all:   'data-*'
     },
-    onChange: () => { markDirty(); updateWordCount(); refreshUsedMarks(); },
+    onChange: handleEditorChange,
     linkTargetNewWindow: true,
     imageUploadBeforeHandler: function(files, info, core, uploadHandler) {
         const alt = (info?.altText ?? info?.alt ?? '').trim();
@@ -262,6 +263,7 @@ _editor = SUNEDITOR.create(_canvasEl, {
         return true;
     }
 });
+_editor.onChange = handleEditorChange;
 }
 
 // ── Drag-and-drop into editor ─────────────────────────────────────────────────
@@ -587,7 +589,7 @@ async function saveSampleData() {
 }
 
 // Keyboard insert — event delegation on the palette container
-document.getElementById('field-palette').addEventListener('click', (e) => {
+document.getElementById('field-palette')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.palette-insert-btn');
     if (!btn || !_editor) return;
     e.stopPropagation();
@@ -2076,6 +2078,11 @@ function updateWorkflowUI() {
         if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(true);
         else document.querySelector('.sun-editor')?.classList.add('tb-editor-locked');
     } else {
+        if (banner) banner.hidden = true;
+        if (comment) {
+            comment.hidden = !window.tbReviewComment;
+            if (window.tbReviewComment) comment.textContent = 'Review feedback: ' + window.tbReviewComment;
+        }
         if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(false);
         else document.querySelector('.sun-editor')?.classList.remove('tb-editor-locked');
     }
@@ -2130,8 +2137,9 @@ document.getElementById('btn-publish')?.addEventListener('click', async () => {
 
 // Timeline
 async function loadTimeline() {
-    if (templateId <= 0) return;
-    const res = await fetch(`/Templates/${templateId}/Audit`);
+    const id = (typeof templateId !== 'undefined' ? templateId : (window.tbTemplateId || 0));
+    if (id <= 0) return;
+    const res = await fetch(`/Templates/${id}/Audit`);
     if (!res.ok) return;
     const rows = await res.json();
     const panel = document.getElementById('tb-timeline-panel');
@@ -2461,7 +2469,8 @@ loadTimeline();
 
 // ── Auto-save draft (server-first; localStorage kept as crash-recovery cache) ─
 
-const DRAFT_KEY         = `tb-draft-${templateId}`;
+const editorTemplateId = (typeof templateId !== 'undefined' ? templateId : (window.tbTemplateId || 0));
+const DRAFT_KEY         = `tb-draft-${editorTemplateId}`;
 const AUTOSAVE_PREF_KEY = 'tb-autosave-enabled';
 const AUTOSAVE_INTERVAL = 60_000;
 
