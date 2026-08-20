@@ -1704,9 +1704,7 @@ and set them in `Edit`:
             Status = template.Status.ToString(),
             DraftBody = template.DraftBody,
             ReviewComment = template.ReviewComment,
-            Body = template.Status == TemplateStatus.Review || template.Status == TemplateStatus.Approved
-                ? template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty
-                : template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
+            Body = template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
 ```
 
 - [ ] **Step 7: Build**
