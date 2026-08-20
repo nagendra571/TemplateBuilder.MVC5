@@ -50,6 +50,19 @@ public class AuditRepositoryTests
     }
 
     [Fact]
+    public async Task Query_with_date_only_To_includes_events_later_that_day()
+    {
+        using var ctx = CreateContext();
+        var repo = new AuditRepository(ctx);
+        await repo.AddAsync(new AuditLog { EntityType = "Template", EntityId = 1, Action = AuditActions.Created, Actor = "bob", OccurredAt = new DateTime(2026, 8, 19, 23, 59, 59) });
+        await repo.AddAsync(new AuditLog { EntityType = "Template", EntityId = 1, Action = AuditActions.Published, Actor = "bob", OccurredAt = new DateTime(2026, 8, 20, 0, 0, 1) });
+
+        var rows = await repo.QueryAsync(new AuditQuery { To = new DateTime(2026, 8, 19) });
+
+        rows.Should().ContainSingle(a => a.Action == AuditActions.Created);
+    }
+
+    [Fact]
     public async Task GetLastOccurrence_returns_most_recent()
     {
         using var ctx = CreateContext();

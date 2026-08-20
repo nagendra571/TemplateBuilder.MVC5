@@ -19,15 +19,16 @@ public class AuditController : TemplateBuilderControllerBase
     public async Task<ActionResult> Index(string? entityType, string? action, string? actor,
         string? from, string? to, string? search, int page = 1)
     {
+        var safePage = Math.Max(1, page);
         var query = new AuditQuery
         {
             EntityType = entityType,
             Action = action,
             Actor = actor,
             From = ParseDate(from),
-            To = ParseDate(to),
+            To = ParseToDate(to),
             Search = search,
-            Page = page,
+            Page = safePage,
             PageSize = 25
         };
 
@@ -38,7 +39,7 @@ public class AuditController : TemplateBuilderControllerBase
         {
             Rows = rows,
             Total = total,
-            Page = page,
+            Page = safePage,
             PageSize = 25,
             EntityType = entityType,
             Action = action,
@@ -60,7 +61,7 @@ public class AuditController : TemplateBuilderControllerBase
             Action = action,
             Actor = actor,
             From = ParseDate(from),
-            To = ParseDate(to),
+            To = ParseToDate(to),
             Search = search,
             Page = 1,
             PageSize = 50000
@@ -83,6 +84,9 @@ public class AuditController : TemplateBuilderControllerBase
 
     private static DateTime? ParseDate(string? value)
         => DateTime.TryParse(value, out var parsed) ? parsed : (DateTime?)null;
+
+    private static DateTime? ParseToDate(string? value)
+        => DateTime.TryParse(value, out var parsed) ? parsed.AddDays(1).AddTicks(-1) : (DateTime?)null;
 
     private static string Quote(string value)
     {

@@ -47,7 +47,11 @@ public class AuditRepository : IAuditRepository
         if (!string.IsNullOrWhiteSpace(query.Action)) q = q.Where(a => a.Action == query.Action);
         if (!string.IsNullOrWhiteSpace(query.Actor)) q = q.Where(a => a.Actor.Contains(query.Actor));
         if (query.From.HasValue) q = q.Where(a => a.OccurredAt >= query.From.Value);
-        if (query.To.HasValue) q = q.Where(a => a.OccurredAt <= query.To.Value);
+        if (query.To.HasValue)
+        {
+            var toExclusive = query.To.Value.Date.AddDays(1);
+            q = q.Where(a => a.OccurredAt < toExclusive);
+        }
         if (!string.IsNullOrWhiteSpace(query.Search))
             q = q.Where(a => a.Action.Contains(query.Search) || a.Actor.Contains(query.Search) || (a.Comment != null && a.Comment.Contains(query.Search)));
         return q;
