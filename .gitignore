@@ -5,3 +5,4 @@ obj/
 # build output — repack with `dotnet pack` when needed
 nupkg/
 packages/
+.superpowers/
