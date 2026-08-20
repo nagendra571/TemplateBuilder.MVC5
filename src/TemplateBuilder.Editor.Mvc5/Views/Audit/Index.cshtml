@@ -1,0 +1,50 @@
+@using TemplateBuilder.Editor.Mvc5.Models
+@model AuditIndexViewModel
+@{
+    ViewBag.Title = "Audit Log";
+}
+
+<div id="tb-editor-host">
+    <h2>Audit Log</h2>
+    <p class="subtitle">Append-only record of who did what and when. @Model.Total total events.</p>
+
+    <form method="get" action="@Url.Action("Index")" class="tb-audit-filters">
+        <input type="text" name="search" value="@Model.Search" placeholder="Search action / actor / comment" />
+        <select name="entityType">
+            <option value="">All types</option>
+            <option value="Template" @(Model.EntityType == "Template" ? "selected" : "")>Templates</option>
+            <option value="Snippet" @(Model.EntityType == "Snippet" ? "selected" : "")>Snippets</option>
+        </select>
+        <input type="text" name="from" placeholder="From (yyyy-MM-dd)" value="@Model.From" />
+        <input type="text" name="to" placeholder="To (yyyy-MM-dd)" value="@Model.To" />
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a class="btn btn-ghost" href="@Url.Action("Export", "Audit", new { search = Model.Search, entityType = Model.EntityType, from = Model.From, to = Model.To })">⬇ Export CSV</a>
+    </form>
+
+    <table class="tb-audit-table">
+        <thead>
+            <tr><th>When</th><th>Who</th><th>Action</th><th>Target</th><th>Comment</th></tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td>@r.OccurredAt.ToLocalTime().ToString("g")</td>
+                <td>@r.Actor</td>
+                <td>@r.Action</td>
+                <td>@r.EntityType #@r.EntityId</td>
+                <td>@r.Comment</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    @if (Model.Page > 1)
+    {
+        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page - 1, search = Model.Search, entityType = Model.EntityType, from = Model.From, to = Model.To })">← Prev</a>
+    }
+    @if (Model.Page * Model.PageSize < Model.Total)
+    {
+        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page + 1, search = Model.Search, entityType = Model.EntityType, from = Model.From, to = Model.To })">Next →</a>
+    }
+</div>

@@ -13,7 +13,10 @@
                 <h1 class="tb-page-title">Templates</h1>
                 <p style="color:var(--text-muted);font-size:13px;margin-top:2px;">Manage your reusable document templates</p>
             </div>
-            <a class="btn btn-primary" href="@Url.Action("Create", "Templates")">+ New Template</a>
+            <div style="display:flex;gap:8px;">
+                <a class="btn btn-secondary" href="@Url.Action("Index", "Audit")">Audit Log</a>
+                <a class="btn btn-primary" href="@Url.Action("Create", "Templates")">+ New Template</a>
+            </div>
         </div>
 
         <!-- Layout: main list + stats sidebar -->

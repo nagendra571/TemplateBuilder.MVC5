@@ -37,6 +37,7 @@
     <ul class="tb-manual-checks">
         <li><code>/TemplateBuilderEditor/css/template-editor.css</code> and <code>/TemplateBuilderEditor/js/template-editor.js</code> return HTTP 200 with the correct Content-Type.</li>
         <li>Open <a href="@Url.Action("LayoutProbe", "Setup")">the layout probe</a> and confirm the editor renders inside <code>#tb-editor-host</code> unaffected by host-page styles.</li>
+        <li>Open <a href="@Url.Action("Index", "Audit")">the audit log</a> and confirm events render and the CSV export downloads.</li>
         <li>Create and edit a template, then confirm preview, version history, restore, and snippets behave as expected.</li>
     </ul>
 </div>
