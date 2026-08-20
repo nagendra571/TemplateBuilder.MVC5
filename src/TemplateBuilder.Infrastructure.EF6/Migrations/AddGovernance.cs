@@ -12,6 +12,35 @@ namespace TemplateBuilder.Infrastructure.EF6.Migrations
             AddColumn("dbo.Templates", "ReviewComment", c => c.String(maxLength: 1000));
             AddColumn("dbo.Snippets", "RowVersion", c => c.Binary(nullable: false, defaultValueSql: "0x00000000000007D0"));
 
+            // Pre-governance PublishVersionAsync computed MAX(VersionNumber)+1 then inserted in a
+            // separate query, so a client DB may already contain duplicate (TemplateId, VersionNumber)
+            // rows. Renumber every row beyond the first per (TemplateId, VersionNumber) to the next
+            // free version number before the unique index below is created.
+            Sql(@"DECLARE @rowId int
+                  DECLARE cur CURSOR LOCAL FAST_FORWARD FOR
+                      SELECT tv.Id
+                      FROM dbo.TemplateVersions tv
+                      WHERE EXISTS (
+                          SELECT 1 FROM dbo.TemplateVersions x
+                          WHERE x.TemplateId = tv.TemplateId
+                            AND x.VersionNumber = tv.VersionNumber
+                            AND x.Id < tv.Id)
+                      ORDER BY tv.TemplateId, tv.VersionNumber, tv.Id
+                  OPEN cur
+                  FETCH NEXT FROM cur INTO @rowId
+                  WHILE @@FETCH_STATUS = 0
+                  BEGIN
+                      UPDATE dbo.TemplateVersions
+                      SET VersionNumber = (
+                          SELECT ISNULL(MAX(VersionNumber), 0) + 1
+                          FROM dbo.TemplateVersions
+                          WHERE TemplateId = (SELECT TemplateId FROM dbo.TemplateVersions WHERE Id = @rowId))
+                      WHERE Id = @rowId
+                      FETCH NEXT FROM cur INTO @rowId
+                  END
+                  CLOSE cur
+                  DEALLOCATE cur");
+
             CreateIndex("dbo.TemplateVersions", new[] { "TemplateId", "VersionNumber" }, unique: true, name: "IX_TemplateVersions_TemplateId_VersionNumber");
 
             CreateTable(

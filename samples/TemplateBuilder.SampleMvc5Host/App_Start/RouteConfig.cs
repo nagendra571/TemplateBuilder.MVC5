@@ -8,14 +8,19 @@ namespace TemplateBuilder.SampleMvc5Host
     {
         public static void RegisterRoutes(RouteCollection routes)
         {
+            // mono/xsp4 fires Application_Start twice in the same AppDomain (~10s apart);
+            // guard the named registrations so the second pass is a no-op.
             TemplateBuilderEditorRouteConfig.RegisterRoutes(routes);
 
             routes.IgnoreRoute("{resource}.axd/{*pathInfo}");
 
-            routes.MapRoute(
-                name: "Default",
-                url: "{controller}/{action}/{id}",
-                defaults: new { controller = "Home", action = "Index", id = UrlParameter.Optional });
+            if (routes["Default"] == null)
+            {
+                routes.MapRoute(
+                    name: "Default",
+                    url: "{controller}/{action}/{id}",
+                    defaults: new { controller = "Home", action = "Index", id = UrlParameter.Optional });
+            }
         }
     }
 }

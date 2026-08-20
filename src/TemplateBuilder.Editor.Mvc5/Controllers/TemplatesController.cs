@@ -381,7 +381,7 @@ public class TemplatesController : TemplateBuilderControllerBase
     public async Task<ActionResult> GetAuditTimeline(int id)
     {
         var rows = await _auditRepository.QueryAsync(new AuditQuery { EntityType = "Template", EntityId = id, PageSize = 100 });
-        return JsonOk(rows.Select(a => new { id = a.Id, action = a.Action, actor = a.Actor, occurredAt = a.OccurredAt, comment = a.Comment }));
+        return JsonOk(rows.Select(a => new { id = a.Id, action = a.Action, actor = a.Actor, occurredAt = a.OccurredAt.ToString("o"), comment = a.Comment }));
     }
 
     private async Task<ActionResult> RunWorkflow(Func<Task<TemplateWorkflowResult>> action)
@@ -392,6 +392,12 @@ public class TemplatesController : TemplateBuilderControllerBase
         }
         catch (DbUpdateConcurrencyException)
         {
+            return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user. Please refresh and try again."));
+        }
+        catch (DbUpdateException)
+        {
+            // PublishVersionAsync retries the unique (TemplateId, VersionNumber) insert 5 times; a
+            // final failure (e.g. sustained concurrent publish) surfaces as 409 per the design spec.
             return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user. Please refresh and try again."));
         }
     }

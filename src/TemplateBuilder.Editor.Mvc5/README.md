@@ -265,7 +265,7 @@ Templates move through an auditable state machine:
 
 ### Audit log (append-only)
 
-Every meaningful action — workflow transitions, draft saves (throttled to at most one per 5 minutes), version saves/restores, snippet create/edit/restore/delete/usage — is written to an append-only `AuditLog` table. Rows are never updated or deleted.
+Every meaningful action — workflow transitions, draft saves (throttled to at most one per 5 minutes), version saves/restores, snippet create/edit/restore/delete — is written to an append-only `AuditLog` table. Rows are never updated or deleted. (Snippet *usage* is tracked separately in the `SnippetUsages` table, not the audit log.)
 
 - **Per-template timeline** — `GET /Templates/{id}/Audit`, also rendered in the editor's Timeline panel (newest first).
 - **Global audit view** — `GET /Audit` with filters (entity type, action, actor, date range, search) and paging.

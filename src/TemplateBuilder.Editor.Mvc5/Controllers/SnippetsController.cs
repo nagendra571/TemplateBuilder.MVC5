@@ -112,7 +112,7 @@ public class SnippetsController : TemplateBuilderControllerBase
     public async Task<ActionResult> GetVersions(int id)
     {
         var versions = await _snippets.GetVersionHistoryAsync(id);
-        return JsonOk(versions.Select(v => new { id = v.Id, versionNumber = v.VersionNumber, body = v.Body, changeComment = v.ChangeComment, createdAt = v.CreatedAt, createdBy = v.CreatedBy }));
+        return JsonOk(versions.Select(v => new { id = v.Id, versionNumber = v.VersionNumber, body = v.Body, changeComment = v.ChangeComment, createdAt = v.CreatedAt.ToString("o"), createdBy = v.CreatedBy }));
     }
 
     [Route("Templates/Api/Snippets/{id:int}/Restore/{versionId:int}")]
