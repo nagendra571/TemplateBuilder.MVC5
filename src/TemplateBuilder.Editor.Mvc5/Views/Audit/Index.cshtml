@@ -15,12 +15,12 @@
             <option value="Template" @(Model.EntityType == "Template" ? "selected" : "")>Templates</option>
             <option value="Snippet" @(Model.EntityType == "Snippet" ? "selected" : "")>Snippets</option>
         </select>
-        <input type="text" name="action" value="@Model.Action" placeholder="Action (exact)" />
+        <input type="text" name="actionName" value="@Model.Action" placeholder="Action (exact)" />
         <input type="text" name="actor" value="@Model.Actor" placeholder="Actor" />
         <input type="text" name="from" placeholder="From (yyyy-MM-dd)" value="@Model.From" />
         <input type="text" name="to" placeholder="To (yyyy-MM-dd)" value="@Model.To" />
         <button type="submit" class="btn btn-primary">Filter</button>
-        <a class="btn btn-ghost" href="@Url.Action("Export", "Audit", new { search = Model.Search, entityType = Model.EntityType, action = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">⬇ Export CSV</a>
+        <a class="btn btn-ghost" href="@Url.Action("Export", "Audit", new { search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">⬇ Export CSV</a>
     </form>
 
     <table class="tb-audit-table">
@@ -43,10 +43,10 @@
 
     @if (Model.Page > 1)
     {
-        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page - 1, search = Model.Search, entityType = Model.EntityType, action = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">← Prev</a>
+        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page - 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">← Prev</a>
     }
     @if (Model.Page * Model.PageSize < Model.Total)
     {
-        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page + 1, search = Model.Search, entityType = Model.EntityType, action = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">Next →</a>
+        <a class="btn btn-ghost" href="@Url.Action("Index", new { page = Model.Page + 1, search = Model.Search, entityType = Model.EntityType, actionName = Model.Action, actor = Model.Actor, from = Model.From, to = Model.To })">Next →</a>
     }
 </div>

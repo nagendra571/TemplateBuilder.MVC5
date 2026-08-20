@@ -16,14 +16,14 @@ public class AuditController : TemplateBuilderControllerBase
 
     [Route("Audit")]
     [HttpGet]
-    public async Task<ActionResult> Index(string? entityType, string? action, string? actor,
+    public async Task<ActionResult> Index(string? entityType, string? actionName, string? actor,
         string? from, string? to, string? search, int page = 1)
     {
         var safePage = Math.Max(1, page);
         var query = new AuditQuery
         {
             EntityType = entityType,
-            Action = action,
+            Action = actionName,
             Actor = actor,
             From = ParseDate(from),
             To = ParseToDate(to),
@@ -42,7 +42,7 @@ public class AuditController : TemplateBuilderControllerBase
             Page = safePage,
             PageSize = 25,
             EntityType = entityType,
-            Action = action,
+            Action = actionName,
             Actor = actor,
             From = from,
             To = to,
@@ -52,13 +52,13 @@ public class AuditController : TemplateBuilderControllerBase
 
     [Route("Audit/Export")]
     [HttpGet]
-    public async Task<ActionResult> Export(string? entityType, string? action, string? actor,
+    public async Task<ActionResult> Export(string? entityType, string? actionName, string? actor,
         string? from, string? to, string? search)
     {
         var query = new AuditQuery
         {
             EntityType = entityType,
-            Action = action,
+            Action = actionName,
             Actor = actor,
             From = ParseDate(from),
             To = ParseToDate(to),
