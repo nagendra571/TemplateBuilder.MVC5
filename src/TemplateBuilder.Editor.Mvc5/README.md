@@ -192,7 +192,7 @@ options.Authorization.PolicyName = "TemplateEditorAccess";
 
 #### What is protected
 
-The filter applies to every editor controller — the full route surface (`/Templates/*` including Edit, Preview, SaveVersion, Versions, Restore, Duplicate, Validate, ToggleActive, the Snippets API, and `/_setup`).
+The filter applies to every editor controller — the full route surface (`/Templates/*` including Edit, Preview, SaveVersion, Versions, Restore, Duplicate, Validate, ToggleActive, the Snippets API, `/Audit`, and `/_setup`).
 
 ---
 
@@ -227,8 +227,55 @@ Every failing check shows a one-line fix.
 | Toggle active | `POST /Templates/{id}/ToggleActive` |
 | List snippets | `GET /Templates/Api/Snippets` |
 | Create snippet | `POST /Templates/Api/Snippets` |
+| Update snippet | `PUT /Templates/Api/Snippets/{id}` |
 | Delete snippet | `DELETE /Templates/Api/Snippets/{id}` |
+| Snippet version history | `GET /Templates/Api/Snippets/{id}/Versions` |
+| Restore snippet version | `POST /Templates/Api/Snippets/{id}/Restore/{versionId}` |
+| Record snippet usage | `POST /Templates/Api/Snippets/{id}/Usage?templateId={id}` |
+| Save server-side draft | `POST /Templates/{id}/Draft` |
+| Submit for review | `POST /Templates/{id}/SubmitForReview` |
+| Approve | `POST /Templates/{id}/Approve` |
+| Reject (with feedback) | `POST /Templates/{id}/Reject` |
+| Cancel review | `POST /Templates/{id}/CancelReview` |
+| Publish | `POST /Templates/{id}/Publish` |
+| Template audit timeline | `GET /Templates/{id}/Audit` |
+| Global audit log | `GET /Audit` |
+| Audit CSV export | `GET /Audit/Export` |
 | Setup check | `GET /Templates/_setup` *(debug only)* |
+
+---
+
+## Governance & Compliance
+
+### Template workflow (draft → review → approve → publish)
+
+Templates move through an auditable state machine:
+
+| Status | Meaning | Editor state |
+|---|---|---|
+| **Draft** | Working state; the body is saved to the server as you type (auto-save drafts) | Editable |
+| **Review** | Submitted for review; the body is frozen | Read-only, lock banner |
+| **Approved** | Approved; still locked until published | Read-only, lock banner |
+| **Published** | The approved body is live as a version | Editable — editing a published template returns it to **Draft** |
+
+- `POST /Templates/{id}/SubmitForReview` moves **Draft → Review**; `POST /Templates/{id}/Approve` moves **Review → Approved**; `POST /Templates/{id}/Publish` moves **Approved → Published** and atomically creates the next version number (concurrent publishes cannot collide — unique `(TemplateId, VersionNumber)`); `POST /Templates/{id}/Reject` returns **Review → Draft** with optional feedback shown in a banner; `POST /Templates/{id}/CancelReview` unlocks editing at any time.
+- **Server-side drafts** — `POST /Templates/{id}/Draft` persists the current body while you type (auto-save, enabled via the toolbar toggle). On a **Published** template, saving a changed body auto-returns it to **Draft**.
+- Invalid transitions and concurrent edits are rejected: state-guard violations return `400 VALIDATION_ERROR`; genuine read/write races (EF6 row-version concurrency) return `409` with "modified by another user".
+- Every transition and draft save is recorded in the audit log with the acting user.
+
+### Audit log (append-only)
+
+Every meaningful action — workflow transitions, draft saves (throttled to at most one per 5 minutes), version saves/restores, snippet create/edit/restore/delete/usage — is written to an append-only `AuditLog` table. Rows are never updated or deleted.
+
+- **Per-template timeline** — `GET /Templates/{id}/Audit`, also rendered in the editor's Timeline panel (newest first).
+- **Global audit view** — `GET /Audit` with filters (entity type, action, actor, date range, search) and paging.
+- **CSV export** — `GET /Audit/Export` downloads `template-builder-audit.csv` with columns `OccurredAt,EntityType,EntityId,Action,Actor,Comment` (UTF-8 with BOM).
+
+### Snippet governance
+
+- Snippets have **version history and usage tracking**. An edit that changes the body creates a new version; metadata-only edits do not. `GET /Templates/Api/Snippets/{id}/Versions` lists history, and `POST /Templates/Api/Snippets/{id}/Restore/{versionId}` restores a version — a restore itself creates a new version, so no state is lost. (The initial body is captured as v1 on the first body change; a never-edited snippet has no version rows yet.)
+- Concurrent snippet edits are rejected with `409` via a row-version concurrency token.
+- Inserting a snippet into a template records usage — `POST /Templates/Api/Snippets/{id}/Usage?templateId={id}` — and the snippet list shows "used Nx in M templates".
 
 ---
 
