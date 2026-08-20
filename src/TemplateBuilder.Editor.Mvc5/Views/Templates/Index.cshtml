@@ -15,8 +15,20 @@
             </div>
             <div style="display:flex;gap:8px;">
                 <a class="btn btn-secondary" href="@Url.Action("Index", "Audit")">Audit Log</a>
+                <a class="btn btn-secondary" href="@Url.Action("Index", "Health")">Health</a>
+                <button type="button" id="btn-import-open" class="btn btn-secondary">Import</button>
                 <a class="btn btn-primary" href="@Url.Action("Create", "Templates")">+ New Template</a>
             </div>
+        </div>
+
+        <!-- Bulk toolbar (hidden until selection) -->
+        <div id="tb-bulk-bar" class="tb-bulk-bar" hidden>
+            <span id="tb-bulk-count" class="tb-bulk-count">0 selected</span>
+            <button type="button" id="btn-bulk-activate" class="btn btn-sm btn-secondary">Activate</button>
+            <button type="button" id="btn-bulk-deactivate" class="btn btn-sm btn-secondary">Deactivate</button>
+            <button type="button" id="btn-bulk-export" class="btn btn-sm btn-secondary">Export ZIP</button>
+            <button type="button" id="btn-bulk-delete" class="btn btn-sm btn-danger">Delete</button>
+            <button type="button" id="btn-bulk-clear" class="btn btn-sm btn-ghost">Clear</button>
         </div>
 
         <!-- Layout: main list + stats sidebar -->
@@ -55,6 +67,8 @@
                         <table class="tb-list-table" role="table" aria-label="Template list">
                             <thead>
                                 <tr>
+                                    <th scope="col" class="tb-check-col"><input type="checkbox" id="tb-check-all" aria-label="Select all templates"></th>
+                                    <th scope="col">Health</th>
                                     <th scope="col">Name</th>
                                     <th scope="col">Type</th>
                                     <th scope="col">Version</th>
@@ -67,6 +81,8 @@
                                 @foreach (var template in Model.Templates)
                                 {
                                     <tr id="row-@template.Id">
+                                        <td class="tb-check-col"><input type="checkbox" class="tb-row-check" value="@template.Id" aria-label="Select @template.Name"></td>
+                                        <td class="tb-health-col"><span class="tb-health-badge" data-template-id="@template.Id">—</span></td>
                                         <td class="tb-col-name">@template.Name</td>
                                         <td>
                                             <span class="tb-badge tb-badge-@template.TemplateType.ToLowerInvariant()">@template.TemplateType</span>
@@ -82,6 +98,7 @@
                                         <td class="tb-col-actions">
                                             <div style="display:flex;gap:4px;justify-content:flex-end;">
                                                 <a class="btn btn-sm btn-secondary" href="@Url.Action("Edit", "Templates", new { id = template.Id })">Edit</a>
+                                                <a class="tb-action-link" style="align-self:center;" href="@Url.Action("ExportTemplate", "Templates", new { id = template.Id })">Export</a>
                                                 <button type="button" class="btn btn-sm btn-secondary"
                                                         data-template-name="@template.Name"
                                                         onclick="openDuplicateModal(@template.Id, this.dataset.templateName)">Duplicate</button>
@@ -124,6 +141,26 @@
 
     </div>
 
+    <!-- Import Modal -->
+    <div class="modal-overlay" id="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+        <div class="modal modal--narrow">
+            <div class="modal-header">
+                <span id="import-modal-title" class="modal-title">Import templates</span>
+                <button type="button" class="modal-close" id="btn-import-close" aria-label="Close">&#x2715;</button>
+            </div>
+            <div class="modal-body">
+                <div class="tb-form-row">
+                    <label for="import-file">Export file (.template.json)</label>
+                    <input type="file" id="import-file" accept=".json">
+                </div>
+                <p class="tb-import-hint">Matched by external key — the same template in dev is updated, new templates are created. Review/Approved targets are skipped. Status: Review/Approved import as Draft.</p>
+                <div id="import-error" class="tb-error-msg" role="alert" style="display:none;"></div>
+                <button type="button" id="btn-import-submit" class="btn btn-primary">Import</button>
+                <div id="import-result" class="tb-import-result"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Duplicate Modal -->
     <div class="modal-overlay" id="duplicate-modal" role="dialog" aria-modal="true" aria-labelledby="duplicate-modal-title">
         <div class="modal modal--narrow">
@@ -147,8 +184,7 @@
 </div>
 
 <script>
-    const _csrf = document.querySelector('input[name=__RequestVerificationToken]')?.value ?? '';
-
+    // _csrf is provided by the package's template-editor.js (loaded by the host layout).
     async function toggleActive(id, btn) {
         btn.disabled = true;
         const res = await fetch(`/Templates/${id}/ToggleActive`, {

@@ -17,4 +17,6 @@ public static class AuditActions
     public const string SnippetEdited = "snippet_edited";
     public const string SnippetDeleted = "snippet_deleted";
     public const string SnippetRestored = "snippet_restored";
+    public const string Imported = "imported";
+    public const string Deleted = "deleted";
 }

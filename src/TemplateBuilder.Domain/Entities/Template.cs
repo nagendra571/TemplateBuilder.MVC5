@@ -7,6 +7,9 @@ public class Template
     public string TemplateType { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? SampleData { get; set; }
+    public Guid ExternalKey { get; set; } = Guid.NewGuid();
+    public string? SourceView { get; set; }
+    public string? SourceViewSnapshot { get; set; }
     public int? CurrentVersionId { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }

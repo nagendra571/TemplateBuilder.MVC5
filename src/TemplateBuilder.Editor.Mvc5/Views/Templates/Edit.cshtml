@@ -114,6 +114,15 @@
                         @Html.ValidationMessageFor(m => m.Description, "", new { @class = "tb-field-error" })
                     </div>
                     <div>
+                        <label for="prop-source-view">Source SQL View</label>
+                        <select id="prop-source-view" name="SourceView">
+                            <option value="">— unbound —</option>
+                            @foreach (var view in Model.AvailableViews)
+                            {
+                                <option value="@view" @(Model.SourceView == view ? "selected" : "")>@view</option>
+                            }
+                        </select>
+                    </div>
                     @if (Model.Id.HasValue)
                     {
                         <div>
@@ -142,7 +151,12 @@
                     @if (Model.Id.HasValue)
                     {
                         <button type="button" id="btn-preview" class="btn btn-secondary">Preview</button>
+                        <button type="button" id="btn-health" class="btn btn-secondary">Health</button>
                         <button type="button" id="btn-save-version" class="btn btn-primary">Save Version</button>
+                        <div id="health-panel" class="tb-health-panel" hidden>
+                            <div id="health-findings"></div>
+                            <div id="health-meta" class="tb-health-meta"></div>
+                        </div>
                     }
                     else
                     {

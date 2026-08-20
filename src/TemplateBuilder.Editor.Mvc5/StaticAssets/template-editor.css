@@ -2008,3 +2008,27 @@
 #tb-editor-host .tb-audit-chart .tb-chart-bar { fill: var(--accent); opacity: .9; transition: opacity var(--transition); }
 #tb-editor-host .tb-audit-chart .tb-chart-bar:hover { opacity: 1; fill: var(--accent-hover); }
 
+/* ── 36. Lifecycle & Ops ── */
+#tb-editor-host .tb-bulk-bar { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:8px 12px; margin-bottom:14px; box-shadow:var(--shadow-sm); }
+#tb-editor-host .tb-bulk-bar[hidden] { display:none; }
+#tb-editor-host .tb-bulk-count { font-size:12px; font-weight:600; color:var(--accent-hover); margin-right:4px; }
+#tb-editor-host .tb-check-col { width:36px; }
+#tb-editor-host .tb-check-col input[type=checkbox], #tb-editor-host .tb-row-check { cursor:pointer; }
+#tb-editor-host .tb-health-badge { display:inline-block; border-radius:20px; padding:2px 9px; font-size:11px; font-weight:600; border:1px solid var(--border); color:var(--text-muted); background:var(--surface2); }
+#tb-editor-host .tb-health-badge[data-severity="healthy"] { background:var(--success-bg); color:var(--success); border-color:var(--success-border); }
+#tb-editor-host .tb-health-badge[data-severity="warning"] { background:var(--warning-bg); color:var(--warning); border-color:var(--warning-border); }
+#tb-editor-host .tb-health-badge[data-severity="critical"] { background:var(--danger-bg); color:var(--danger); border-color:var(--danger-border); }
+#tb-editor-host .tb-import-hint { font-size:12px; color:var(--text-muted); margin:0 0 10px; }
+#tb-editor-host .tb-import-result { margin-top:12px; display:flex; flex-direction:column; gap:6px; }
+#tb-editor-host .tb-import-entry { border-left:3px solid var(--border); padding:6px 10px; font-size:12px; background:var(--bg); border-radius:0 6px 6px 0; }
+#tb-editor-host .tb-import-entry--created { border-color:var(--success); }
+#tb-editor-host .tb-import-entry--updated { border-color:var(--accent); }
+#tb-editor-host .tb-import-entry--skipped { border-color:var(--warning); }
+#tb-editor-host .tb-import-entry--error { border-color:var(--danger); }
+#tb-editor-host .tb-health-panel { border:1px solid var(--border); border-radius:var(--radius-md); padding:10px 12px; margin-top:10px; background:var(--bg); }
+#tb-editor-host .tb-health-panel[hidden] { display:none; }
+#tb-editor-host .tb-health-finding { border-left:3px solid var(--border); padding:4px 10px; font-size:12px; margin-bottom:6px; background:var(--surface2); border-radius:0 6px 6px 0; }
+#tb-editor-host .tb-health-finding--critical { border-color:var(--danger); }
+#tb-editor-host .tb-health-finding--warning { border-color:var(--warning); }
+#tb-editor-host .tb-health-meta { font-size:11px; color:var(--text-muted); margin-top:6px; }
+#tb-editor-host .tb-health-more { font-size:11px; color:var(--text-muted); }

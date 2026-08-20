@@ -25,6 +25,7 @@ public class InterfaceContractTests
             "GetVersionHistoryAsync",
             "GetNextVersionNumberAsync",
             "CreateAsync",
+            "DeleteAsync",
             "UpdateTemplateAsync",
             "PublishVersionAsync"
         };

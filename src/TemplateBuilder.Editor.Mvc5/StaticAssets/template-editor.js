@@ -731,6 +731,7 @@ async function saveVersion() {
                 name: document.getElementById('prop-name').value,
                 templateType: document.getElementById('prop-type').value,
                 description: document.getElementById('prop-desc').value,
+                sourceView: document.getElementById('prop-source-view')?.value ?? '',
                 body,
                 changeComment: document.getElementById('save-comment').value
             })
@@ -2840,3 +2841,149 @@ setTimeout(updateWordCount, 400);
     }, 30000);
 })();
 
+(function initBulkOps() {
+    const bar = document.getElementById('tb-bulk-bar');
+    if (!bar) return;
+    const checks = () => [...document.querySelectorAll('.tb-row-check')];
+    const countEl = document.getElementById('tb-bulk-count');
+    const selectedIds = () => checks().filter(c => c.checked).map(c => parseInt(c.value, 10));
+
+    function refresh() {
+        const n = selectedIds().length;
+        bar.hidden = n === 0;
+        if (countEl) countEl.textContent = `${n} selected`;
+    }
+    checks().forEach(c => c.addEventListener('change', refresh));
+    const selectAll = document.getElementById('tb-check-all');
+    if (selectAll) selectAll.addEventListener('change', () => { checks().forEach(c => { c.checked = selectAll.checked; }); refresh(); });
+
+    async function bulkPost(url, extra) {
+        const ids = selectedIds();
+        if (!ids.length) return null;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+            body: JSON.stringify({ ids, ...(extra || {}) })
+        });
+        return res.ok ? res.json() : null;
+    }
+
+    document.getElementById('btn-bulk-activate')?.addEventListener('click', async () => {
+        const r = await bulkPost('/Templates/BulkActivate');
+        if (r) showToast(`Activated ${r.succeeded.length} template(s).`);
+        location.reload();
+    });
+    document.getElementById('btn-bulk-deactivate')?.addEventListener('click', async () => {
+        const r = await bulkPost('/Templates/BulkDeactivate');
+        if (r) showToast(`Deactivated ${r.succeeded.length} template(s).`);
+        location.reload();
+    });
+    document.getElementById('btn-bulk-delete')?.addEventListener('click', async () => {
+        const n = selectedIds().length;
+        if (!confirm(`Delete ${n} template(s)? Version history is removed; audit records remain.`)) return;
+        const r = await bulkPost('/Templates/BulkDelete');
+        if (r) showToast(`Deleted ${r.succeeded.length} template(s).`);
+        location.reload();
+    });
+    document.getElementById('btn-bulk-export')?.addEventListener('click', async () => {
+        const ids = selectedIds();
+        const res = await fetch('/Templates/BulkExport', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
+            body: JSON.stringify({ ids })
+        });
+        if (res.ok) {
+            const blob = await res.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'template-builder-export.zip';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } else showToast('Bulk export failed.');
+    });
+    document.getElementById('btn-bulk-clear')?.addEventListener('click', () => { checks().forEach(c => { c.checked = false; }); refresh(); });
+})();
+
+(function initHealthBadges() {
+    const badges = [...document.querySelectorAll('.tb-health-badge')];
+    if (!badges.length) return;
+    const ids = badges.map(b => b.getAttribute('data-template-id')).join(',');
+    fetch(`/Health/Summaries?ids=${ids}`, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(list => {
+            const byId = new Map(list.map(x => [String(x.templateId), x]));
+            badges.forEach(b => {
+                const s = byId.get(b.getAttribute('data-template-id'));
+                if (!s) return;
+                b.setAttribute('data-severity', s.severity);
+                b.textContent = s.severity === 'healthy' ? 'Healthy'
+                    : s.severity === 'critical' ? `${s.findingCount} issue${s.findingCount === 1 ? '' : 's'}`
+                    : `${s.findingCount} warning${s.findingCount === 1 ? '' : 's'}`;
+            });
+        })
+        .catch(() => { /* badges stay as '—' */ });
+})();
+
+(function initImportModal() {
+    const modal = document.getElementById('import-modal');
+    if (!modal) return;
+    const open = document.getElementById('btn-import-open');
+    const close = document.getElementById('btn-import-close');
+    const submit = document.getElementById('btn-import-submit');
+    const fileInput = document.getElementById('import-file');
+    const result = document.getElementById('import-result');
+    const errEl = document.getElementById('import-error');
+
+    open?.addEventListener('click', () => { modal.classList.add('open'); if (result) result.innerHTML = ''; if (errEl) errEl.style.display = 'none'; });
+    close?.addEventListener('click', () => { modal.classList.remove('open'); });
+
+    function renderEntry(entry, kind) {
+        const text = entry.name
+            ? `<b>${escapeHtml(entry.name)}</b>${entry.reason ? ` — ${escapeHtml(entry.reason)}` : ''}${entry.versionsAppended ? ` · ${entry.versionsAppended} versions appended` : ''}`
+            : escapeHtml(entry.reason || 'Unknown file');
+        return `<div class="tb-import-entry tb-import-entry--${kind}">${text}</div>`;
+    }
+
+    submit?.addEventListener('click', async () => {
+        if (!fileInput || !fileInput.files || !fileInput.files.length) {
+            if (errEl) { errEl.textContent = 'Choose a .template.json file first.'; errEl.style.display = 'block'; }
+            return;
+        }
+        const fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        const res = await fetch('/Templates/Import', { method: 'POST', headers: { 'RequestVerificationToken': _csrf }, body: fd });
+        if (!res.ok) { if (errEl) { errEl.textContent = 'Import failed.'; errEl.style.display = 'block'; } return; }
+        const r = await res.json();
+        if (result) {
+            result.innerHTML = [
+                ...(r.created || []).map(e => renderEntry(e, 'created')),
+                ...(r.updated || []).map(e => renderEntry(e, 'updated')),
+                ...(r.skipped || []).map(e => renderEntry(e, 'skipped')),
+                ...(r.errors || []).map(e => renderEntry(e, 'error'))
+            ].join('');
+        }
+        showToast('Import complete.');
+        setTimeout(() => location.reload(), 2500);
+    });
+})();
+
+(function initEditorHealth() {
+    const btn = document.getElementById('btn-health');
+    const panel = document.getElementById('health-panel');
+    if (!btn || !panel || window.tbIsCreate === 'true' || (window.tbTemplateId || 0) <= 0) return;
+    const findings = document.getElementById('health-findings');
+    const meta = document.getElementById('health-meta');
+    btn.addEventListener('click', async () => {
+        const res = await fetch(`/Templates/${window.tbTemplateId}/Health`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) return;
+        const r = await res.json();
+        panel.hidden = false;
+        if (findings) {
+            const items = r.findings.filter(f => f.severity !== 'info' && f.severity !== 0);
+            findings.innerHTML = items.length
+                ? items.map(f => `<div class="tb-health-finding tb-health-finding--${f.severity === 2 ? 'critical' : 'warning'}">${escapeHtml(f.message)}</div>`).join('')
+                : '<div class="tb-health-finding">No issues — template matches the schema.</div>';
+        }
+        if (meta) meta.textContent = r.sourceView ? `Bound to ${r.sourceView} · checked just now` : 'Template is not bound to a SQL view.';
+    });
+})();

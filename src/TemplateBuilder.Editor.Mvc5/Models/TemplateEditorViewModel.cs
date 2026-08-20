@@ -18,6 +18,7 @@ public class TemplateEditorViewModel
 
     public string? SampleData { get; set; }
 
+    public string? SourceView { get; set; }
     public string? Body { get; set; }
     public int? CurrentVersionId { get; set; }
     public int CurrentVersionNumber { get; set; }

@@ -46,11 +46,26 @@ public class TemplateRepository : ITemplateRepository
 
     public async Task<Template> CreateAsync(Template template, CancellationToken ct = default)
     {
+        if (template.ExternalKey == Guid.Empty)
+            template.ExternalKey = Guid.NewGuid();
         template.CreatedAt = DateTime.UtcNow;
         template.UpdatedAt = DateTime.UtcNow;
         _db.Templates.Add(template);
         await _db.SaveChangesAsync(ct);
         return template;
+    }
+
+    public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
+    {
+        var template = await _db.Templates.FindAsync(ct, id);
+        if (template is null) return false;
+        template.CurrentVersionId = null;
+        await _db.SaveChangesAsync(ct);
+        var versions = await _db.TemplateVersions.Where(v => v.TemplateId == id).ToListAsync(ct);
+        _db.TemplateVersions.RemoveRange(versions);
+        _db.Templates.Remove(template);
+        await _db.SaveChangesAsync(ct);
+        return true;
     }
 
     public async Task UpdateTemplateAsync(Template template, CancellationToken ct = default)
@@ -66,6 +81,7 @@ public class TemplateRepository : ITemplateRepository
     public async Task<TemplateVersion> PublishVersionAsync(int templateId, TemplateVersion version, Action<Template>? updateTemplate, CancellationToken ct = default)
     {
         version.CreatedAt = DateTime.UtcNow;
+        version.TemplateId = templateId;
 
         for (var attempt = 0; ; attempt++)
         {

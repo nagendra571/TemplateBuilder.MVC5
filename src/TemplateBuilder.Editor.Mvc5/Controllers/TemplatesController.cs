@@ -1,12 +1,15 @@
 using System;
 using System.Data.Entity.Infrastructure;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using System.Web.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 using TemplateBuilder.Application.Services;
 using TemplateBuilder.Domain.Entities;
 using TemplateBuilder.Domain.Exceptions;
@@ -28,8 +31,10 @@ public class TemplatesController : TemplateBuilderControllerBase
     private readonly ITemplateWorkflowService _workflow;
     private readonly IAuditService _audit;
     private readonly IAuditRepository _auditRepository;
+    private readonly ITemplatePromotionService _promotion;
+    private readonly ITemplateHealthService _health;
 
-    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator, ITemplateWorkflowService workflow, IAuditService audit, IAuditRepository auditRepository)
+    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator, ITemplateWorkflowService workflow, IAuditService audit, IAuditRepository auditRepository, ITemplatePromotionService promotion, ITemplateHealthService health)
     {
         _repository = repository;
         _viewDiscovery = viewDiscovery;
@@ -39,6 +44,8 @@ public class TemplatesController : TemplateBuilderControllerBase
         _workflow = workflow;
         _audit = audit;
         _auditRepository = auditRepository;
+        _promotion = promotion;
+        _health = health;
     }
 
     [HttpGet]
@@ -117,7 +124,8 @@ public class TemplatesController : TemplateBuilderControllerBase
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
             AvailableViews = views.ToList(),
-            SampleData = template.SampleData
+            SampleData = template.SampleData,
+            SourceView = template.SourceView
         });
     }
 
@@ -136,6 +144,10 @@ public class TemplatesController : TemplateBuilderControllerBase
             template.Name = request.Name.Trim();
             template.TemplateType = request.TemplateType;
             template.Description = request.Description;
+            var previousSourceView = template.SourceView;
+            template.SourceView = string.IsNullOrWhiteSpace(request.SourceView) ? null : request.SourceView.Trim();
+            if (!string.Equals(previousSourceView, template.SourceView, StringComparison.OrdinalIgnoreCase))
+                template.SourceViewSnapshot = template.SourceView is null ? null : await _health.BuildSnapshotJsonAsync(template.SourceView);
             await _repository.UpdateTemplateAsync(template);
             var nextNumber = await _repository.GetNextVersionNumberAsync(id);
             published = await _repository.PublishVersionAsync(id, new TemplateVersion
@@ -376,6 +388,103 @@ public class TemplatesController : TemplateBuilderControllerBase
     public async Task<ActionResult> Publish(int id)
         => await RunWorkflow(() => _workflow.PublishAsync(id, CurrentActor));
 
+    [Route("Templates/Export/{id:int}")]
+    [HttpGet]
+    public async Task<ActionResult> ExportTemplate(int id)
+    {
+        var doc = await _promotion.BuildExportAsync(id);
+        if (doc is null) return HttpNotFound();
+        var bytes = Encoding.UTF8.GetBytes(_promotion.SerializeExport(doc));
+        Response.AddHeader("Content-Disposition", $"attachment; filename={_promotion.SanitizeFileName(doc.Template.Name)}.template.json");
+        return File(bytes, "application/json");
+    }
+
+    [Route("Templates/Import")]
+    [HttpPost]
+    public async Task<ActionResult> Import(HttpPostedFileBase file)
+    {
+        if (file is null || file.ContentLength == 0)
+            return Content(JsonConvert.SerializeObject(new { errors = new[] { new { reason = "No file selected." } } }), "application/json");
+        using var ms = new MemoryStream();
+        await file.InputStream.CopyToAsync(ms);
+        var result = await _promotion.ImportAsync(ms.ToArray(), CurrentActor);
+        return Content(JsonConvert.SerializeObject(result, new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        }), "application/json");
+    }
+
+    [Route("Templates/BulkActivate")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> BulkActivate(BulkIdsRequest request)
+        => await BulkToggle(request.Ids, active: true);
+
+    [Route("Templates/BulkDeactivate")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> BulkDeactivate(BulkIdsRequest request)
+        => await BulkToggle(request.Ids, active: false);
+
+    private async Task<ActionResult> BulkToggle(IReadOnlyList<int> ids, bool active)
+    {
+        var succeeded = new List<int>();
+        var failed = new List<object>();
+        foreach (var id in ids)
+        {
+            try
+            {
+                var t = await _repository.GetByIdAsync(id);
+                if (t is null) { failed.Add(new { id, reason = "NOT_FOUND" }); continue; }
+                if (t.IsActive == active) { succeeded.Add(id); continue; }
+                t.IsActive = active;
+                await _repository.UpdateTemplateAsync(t);
+                await _audit.RecordAsync("Template", id, AuditActions.ToggledActive, CurrentActor, afterState: JsonConvert.SerializeObject(new { isActive = active }));
+                succeeded.Add(id);
+            }
+            catch (Exception) { failed.Add(new { id, reason = "ERROR" }); }
+        }
+        return Content(JsonConvert.SerializeObject(new { succeeded, failed }), "application/json");
+    }
+
+    [Route("Templates/BulkExport")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> BulkExport(BulkIdsRequest request)
+    {
+        var zip = await _promotion.BuildBulkZipAsync(request.Ids);
+        Response.AddHeader("Content-Disposition", "attachment; filename=template-builder-export.zip");
+        return File(zip, "application/zip");
+    }
+
+    [Route("Templates/BulkDelete")]
+    [HttpPost, ValidateJsonAntiForgeryToken]
+    public async Task<ActionResult> BulkDelete(BulkIdsRequest request)
+    {
+        var succeeded = new List<int>();
+        var failed = new List<object>();
+        foreach (var id in request.Ids)
+        {
+            try
+            {
+                var t = await _repository.GetByIdAsync(id);
+                if (t is null) { failed.Add(new { id, reason = "NOT_FOUND" }); continue; }
+                await _audit.RecordAsync("Template", id, AuditActions.Deleted, CurrentActor, beforeState: JsonConvert.SerializeObject(new { name = t.Name }));
+                if (await _repository.DeleteAsync(id)) succeeded.Add(id); else failed.Add(new { id, reason = "NOT_FOUND" });
+            }
+            catch (Exception) { failed.Add(new { id, reason = "ERROR" }); }
+        }
+        return Content(JsonConvert.SerializeObject(new { succeeded, failed }), "application/json");
+    }
+
+    [Route("Templates/{id:int}/Health")]
+    [HttpGet]
+    public async Task<ActionResult> GetHealth(int id)
+    {
+        var report = await _health.CheckAsync(id);
+        return Content(JsonConvert.SerializeObject(report, new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        }), "application/json");
+    }
+
     [Route("Templates/{id:int}/Audit")]
     [HttpGet]
     public async Task<ActionResult> GetAuditTimeline(int id)
@@ -412,4 +521,9 @@ public class TemplatesController : TemplateBuilderControllerBase
             _ => JsonError(400, new ErrorResult("VALIDATION_ERROR", result.ErrorMessage!))
         };
     }
+}
+
+public class BulkIdsRequest
+{
+    public List<int> Ids { get; set; } = new List<int>();
 }

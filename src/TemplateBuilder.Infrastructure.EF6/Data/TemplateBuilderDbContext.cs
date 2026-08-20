@@ -34,6 +34,11 @@ public class TemplateBuilderDbContext : DbContext
         template.Property(t => t.Description).HasMaxLength(500);
         template.Property(t => t.RowVersion).IsRowVersion();
         template.Property(t => t.ReviewComment).HasMaxLength(1000);
+        template.Property(t => t.ExternalKey).IsRequired().HasColumnAnnotation(
+            IndexAnnotation.AnnotationName,
+            new IndexAnnotation(new IndexAttribute("IX_Templates_ExternalKey") { IsUnique = true }));
+        template.Property(t => t.SourceView).HasMaxLength(200);
+        template.Property(t => t.SourceViewSnapshot).IsMaxLength();
         template.HasMany(t => t.Versions)
             .WithRequired(v => v.Template)
             .HasForeignKey(v => v.TemplateId)

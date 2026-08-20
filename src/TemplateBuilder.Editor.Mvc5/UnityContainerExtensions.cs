@@ -41,6 +41,9 @@ public static class UnityContainerExtensions
         container.RegisterType<IAuditStatsRepository, AuditStatsRepository>(new HierarchicalLifetimeManager());
         container.RegisterType<IAuditService, AuditService>(new ContainerControlledLifetimeManager());
         container.RegisterType<ITemplateWorkflowService, TemplateWorkflowService>(new HierarchicalLifetimeManager());
+        container.RegisterType<ITemplatePromotionRepository, TemplatePromotionRepository>(new HierarchicalLifetimeManager());
+        container.RegisterType<ITemplatePromotionService, TemplatePromotionService>(new HierarchicalLifetimeManager());
+        container.RegisterType<ITemplateHealthService, TemplateHealthService>(new HierarchicalLifetimeManager());
         container.RegisterInstance(new TemplateBuilderOptions());
         container.RegisterFactory<ISqlViewDiscoveryService>(
             c => new SqlViewDiscoveryService(connectionString, c.Resolve<TemplateBuilderOptions>()),

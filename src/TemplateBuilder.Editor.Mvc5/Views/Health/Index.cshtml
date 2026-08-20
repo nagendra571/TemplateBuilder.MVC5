@@ -1,0 +1,62 @@
+@using TemplateBuilder.Editor.Mvc5.Models
+@using TemplateBuilder.Application.Services
+@model HealthIndexViewModel
+@{
+    ViewBag.Title = "Template Health";
+    var critical = Model.Rows.Count(r => r.Report.Findings.Any(f => f.Severity == HealthSeverity.Critical));
+    var warnings = Model.Rows.Count(r => r.Report.Findings.Any(f => f.Severity == HealthSeverity.Warning) && !r.Report.Findings.Any(f => f.Severity == HealthSeverity.Critical));
+    var healthy = Model.Rows.Count(r => !r.Report.Findings.Any(f => f.Severity != HealthSeverity.Info));
+    var unbound = Model.Rows.Count(r => string.IsNullOrWhiteSpace(r.Report.SourceView));
+}
+<div id="tb-editor-host" class="tb-audit-page">
+    <div class="tb-page-content">
+        <div class="tb-page-header">
+            <div>
+                <h1 class="tb-page-title">Template Health</h1>
+                <p class="tb-audit-subtitle">Field drift between template bodies and the live SQL view schema.</p>
+            </div>
+            <div class="tb-audit-header-actions">
+                <a class="btn btn-secondary" href="@Url.Action("Index", "Health")">Re-check all</a>
+            </div>
+        </div>
+        <div class="tb-audit-stats">
+            <div class="tb-audit-stat"><div class="tb-audit-stat-value">@healthy</div><div class="tb-audit-stat-label">Healthy</div></div>
+            <div class="tb-audit-stat"><div class="tb-audit-stat-value">@warnings</div><div class="tb-audit-stat-label">Warnings</div></div>
+            <div class="tb-audit-stat"><div class="tb-audit-stat-value">@critical</div><div class="tb-audit-stat-label">Critical</div></div>
+            <div class="tb-audit-stat"><div class="tb-audit-stat-value">@unbound</div><div class="tb-audit-stat-label">Unbound</div></div>
+        </div>
+        <div class="tb-audit-card tb-audit-table-card">
+            <div class="tb-audit-table-wrap">
+                <table class="tb-audit-table">
+                    <thead>
+                        <tr><th>Template</th><th>Source view</th><th>Status</th><th>Findings</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Rows)
+                        {
+                            var r = row.Report;
+                            var worst = r.Worst;
+                            var badge = worst == HealthSeverity.Critical ? "tb-action-badge--snippet_deleted" : worst == HealthSeverity.Warning ? "tb-action-badge--toggled_active" : "tb-action-badge--published";
+                            <tr>
+                                <td><a class="tb-audit-target" href="@Url.Action("Edit", "Templates", new { id = row.TemplateId })"><b>@row.Name</b></a></td>
+                                <td>@(r.SourceView ?? "—")</td>
+                                <td><span class="tb-action-badge @badge">@(worst == HealthSeverity.Critical ? "Critical" : worst == HealthSeverity.Warning ? "Warning" : "Healthy")</span></td>
+                                <td>
+                                    @foreach (var f in r.Findings.Where(f => f.Severity != HealthSeverity.Info).Take(3))
+                                    {
+                                        <div class="tb-health-finding tb-health-finding--@(f.Severity == HealthSeverity.Critical ? "critical" : "warning")">@f.Message</div>
+                                    }
+                                    @if (r.Findings.Count(f => f.Severity != HealthSeverity.Info) > 3)
+                                    {
+                                        <div class="tb-health-more">+@(r.Findings.Count(f => f.Severity != HealthSeverity.Info) - 3) more</div>
+                                    }
+                                </td>
+                                <td class="tb-col-actions"><a class="tb-action-link" href="@Url.Action("Index", "Health")">Re-check</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

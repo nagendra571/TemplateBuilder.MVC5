@@ -6,7 +6,11 @@
     <PackageReference Include="HtmlSanitizer" Version="9.2.995" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Scriban" Version="7.2.6" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
