@@ -200,3 +200,25 @@ Plan deviations worth knowing (also in MEMORY.md):
   Repacked 1.1.0 and re-inspected the nuspec: dependency present. Sample host retains the
   local CopyPackageAssemblies addition for System.Web.Helpers.dll (packages.config hosts do
   not consume nuspec dependencies).
+
+## 2026-08-21 — v1.2.0 two-state save model (Tasks 1-8 of the two-state-save plan)
+
+Gate table — actual command outputs from the task reports; Task 8 not yet run.
+
+| # | Gate | Command | Result (from task report) |
+|---|---|---|---|
+| 1 | Domain suite | `dotnet test tests/TemplateBuilder.Domain.Tests` | `Passed! - Failed: 0, Passed: 20, Total: 20` |
+| 1 | EF6 suite | `dotnet test tests/TemplateBuilder.Infrastructure.EF6.Tests` | `Passed! - Failed: 0, Passed: 40, Total: 40` (37 + 3 new) |
+| 1 | Migration apply | sqlcmd on `mssql-tb` (AddVersionIsActive) | `IsActive NO ((1))`; `202608210016543_AddVersionIsActive` in `__MigrationHistory` |
+| 2 | Engine contract | `dotnet test tests/TemplateBuilder.Application.Tests --filter "FullyQualifiedName~TemplateEngineTests"` | RED 13/19 → GREEN `Passed! - Failed: 0, Passed: 19, Total: 19` |
+| 2 | Application suite | same, no filter | `Passed! - Failed: 0, Passed: 91, Total: 91` |
+| 3 | Promotion suite | `--filter "FullyQualifiedName~TemplatePromotion"` | RED CS1061/CS0117 → GREEN `Passed! - Failed: 0, Passed: 9, Total: 9` |
+| 3 | Application suite | same, no filter | `Passed! - Failed: 0, Passed: 86, Total: 86` (one transient mono host crash, re-run passed) |
+| 4 | Solution build | `dotnet build TemplateBuilder.Mvc5.sln --nologo` | 0 errors, 24 warnings (all pre-existing) |
+| 4 | Domain / Application / EF6 | dotnet test per project | 19/19, 72/72, 41/41 |
+| 4 | Migration from empty | `DbMigrator` probe on scratch DB (`TemplateBuilderMvc5MigProbe`) | 6/6 migrations applied, ends `202608210121111_SimplifyTemplateStatus`; Templates has none of the 3 workflow columns |
+| 5 | Editor build | `dotnet build src/TemplateBuilder.Editor.Mvc5/TemplateBuilder.Editor.Mvc5.csproj -c Debug --nologo` | `Build succeeded. 0 Error(s), 6 Warning(s)` (pre-existing; RazorGenerator re-ran, 7 views regenerated) |
+| 6 | JS syntax | `node --check src/TemplateBuilder.Editor.Mvc5/StaticAssets/template-editor.js` | exit 0, no output |
+| 6 | Editor build | as Task 5 | 0 Errors, 21 warnings (all pre-existing); codegen contains `btn-save-draft` / `tb-badge-live` |
+| 7 | Version + docs | csproj `<Version>` + README/PROGRESS/MEMORY | `1.2.0` (this task, verified by grep); docs updated |
+| 8 | End-to-end smoke | Task 8 gate commands | executed in Task 8 |

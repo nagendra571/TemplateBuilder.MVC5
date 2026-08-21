@@ -1,6 +1,6 @@
 # TemplateBuilder.Editor.Mvc5
 
-**Current version: 1.1.0**
+**Current version: 1.2.0**
 
 Embed a full Scriban-powered HTML template management UI into any ASP.NET MVC 5 application running on .NET Framework 4.8. Install the package, register a Unity container, wire up two routes — and your users can create, edit, version, compare, preview, and restore templates with reusable snippets, all wrapped in your own site layout.
 
@@ -217,6 +217,7 @@ Every failing check shows a one-line fix.
 | Template list | `GET /Templates` |
 | Create template | `GET/POST /Templates/Create` |
 | Edit template | `GET /Templates/{id}/Edit` |
+| Save draft version | `POST /Templates/{id}/SaveVersion (isActive:false)` |
 | Save version | `POST /Templates/{id}/SaveVersion` |
 | Version history | `GET /Templates/{id}/Versions` |
 | Version body (for compare) | `GET /Templates/{id}/Versions/{versionId}/Body` |
@@ -232,12 +233,6 @@ Every failing check shows a one-line fix.
 | Snippet version history | `GET /Templates/Api/Snippets/{id}/Versions` |
 | Restore snippet version | `POST /Templates/Api/Snippets/{id}/Restore/{versionId}` |
 | Record snippet usage | `POST /Templates/Api/Snippets/{id}/Usage?templateId={id}` |
-| Save server-side draft | `POST /Templates/{id}/Draft` |
-| Submit for review | `POST /Templates/{id}/SubmitForReview` |
-| Approve | `POST /Templates/{id}/Approve` |
-| Reject (with feedback) | `POST /Templates/{id}/Reject` |
-| Cancel review | `POST /Templates/{id}/CancelReview` |
-| Publish | `POST /Templates/{id}/Publish` |
 | Template audit timeline | `GET /Templates/{id}/Audit` |
 | Global audit log | `GET /Audit` |
 | Audit CSV export | `GET /Audit/Export` |
@@ -256,25 +251,18 @@ Every failing check shows a one-line fix.
 
 ## Governance & Compliance
 
-### Template workflow (draft → review → approve → publish)
+### Two-state saves
 
-Templates move through an auditable state machine:
+Templates use a simple two-state save model — there is no review/approval workflow:
 
-| Status | Meaning | Editor state |
-|---|---|---|
-| **Draft** | Working state; the body is saved to the server as you type (auto-save drafts) | Editable |
-| **Review** | Submitted for review; the body is frozen | Read-only, lock banner |
-| **Approved** | Approved; still locked until published | Read-only, lock banner |
-| **Published** | The approved body is live as a version | Editable — editing a published template returns it to **Draft** |
-
-- `POST /Templates/{id}/SubmitForReview` moves **Draft → Review**; `POST /Templates/{id}/Approve` moves **Review → Approved**; `POST /Templates/{id}/Publish` moves **Approved → Published** and atomically creates the next version number (concurrent publishes cannot collide — unique `(TemplateId, VersionNumber)`); `POST /Templates/{id}/Reject` returns **Review → Draft** with optional feedback shown in a banner; `POST /Templates/{id}/CancelReview` unlocks editing at any time.
-- **Server-side drafts** — `POST /Templates/{id}/Draft` persists the current body while you type (auto-save, enabled via the toolbar toggle). On a **Published** template, saving a changed body auto-returns it to **Draft**.
-- Invalid transitions and concurrent edits are rejected: state-guard violations return `400 VALIDATION_ERROR`; genuine read/write races (EF6 row-version concurrency) return `409` with "modified by another user".
-- Every transition and draft save is recorded in the audit log with the acting user.
+- **Each version is either Draft or Active** (`TemplateVersion.IsActive`). **Save draft version** saves the current body as a new Draft version; **Save version** saves it as the Active version (the live one). Both kinds of versions carry the same full version history, compare, and restore capabilities.
+- **The editor shows the latest version**, with a "Draft version" badge when the latest version is a draft; the version history lists every version with an **Active** / **Draft** badge.
+- **The render API serves the last Active version.** `ITemplateEngine.RenderAsync` / `RenderByNameAsync` throw `TemplateNotFoundException` (no such template), `TemplateInactiveException` (the template is not servable), or `NoActiveVersionException` (no Active version exists yet) instead of silently rendering a draft.
+- **Template `IsActive` is the servable switch** — `POST /Templates/{id}/ToggleActive` (or the bulk Activate/Deactivate actions) turns serving on/off independently of which version is latest. A template can be active as a whole while its latest version is still a draft.
 
 ### Audit log (append-only)
 
-Every meaningful action — workflow transitions, draft saves (throttled to at most one per 5 minutes), version saves/restores, snippet create/edit/restore/delete — is written to an append-only `AuditLog` table. Rows are never updated or deleted. (Snippet *usage* is tracked separately in the `SnippetUsages` table, not the audit log.)
+Every meaningful action — version saves/restores (draft and active), snippet create/edit/restore/delete — is written to an append-only `AuditLog` table. Rows are never updated or deleted. (Snippet *usage* is tracked separately in the `SnippetUsages` table, not the audit log.)
 
 - **Per-template timeline** — `GET /Templates/{id}/Audit`, also rendered in the editor's Timeline panel (newest first).
 - **Global audit view** — `GET /Audit` with filters (entity type, action, actor, date range, search) and paging.
@@ -292,8 +280,8 @@ Every meaningful action — workflow transitions, draft saves (throttled to at m
 
 ### Export / import (dev → prod promotion)
 
-- **Export** — `GET /Templates/Export/{id}` downloads a camelCase JSON document (`schemaVersion: 1`) containing the template metadata, its `externalKey` (a stable GUID identity assigned at creation), and the full ordered version history. The list page has an **Export** row action; `POST /Templates/BulkExport` packages multiple templates into a ZIP with a `_summary.json` manifest.
-- **Import** — `POST /Templates/Import` (multipart file upload) matches by `externalKey`: templates with a matching key in the target environment get their metadata updated and their versions appended (continuing from the target's next version number); new keys create new templates with original version numbers preserved. **Locked targets are never clobbered** — Review/Approved templates are skipped. Exported Review/Approved statuses collapse to Draft on import, so promotion always requires a local review/approval pass.
+- **Export** — `GET /Templates/Export/{id}` downloads a camelCase JSON document (`schemaVersion: 2`) containing the template metadata, its `externalKey` (a stable GUID identity assigned at creation), and the full ordered version history — each version carrying its `isActive` flag. The list page has an **Export** row action; `POST /Templates/BulkExport` packages multiple templates into a ZIP with a `_summary.json` manifest.
+- **Import** — `POST /Templates/Import` (multipart file upload) matches by `externalKey`: templates with a matching key in the target environment get their metadata updated and their versions appended (continuing from the target's next version number); new keys create new templates with original version numbers preserved. **Documents with `schemaVersion != 2` are rejected** (v1 exports are not imported); per-version `isActive` flags and the template `isActive` switch are preserved exactly — nothing is skipped or collapsed.
 - The import modal on the list page renders per-entry results (created / updated with "N versions appended" / skipped / errors).
 - `SourceView`/`SourceViewSnapshot` are deliberately **not** exported — they are environment-local schema expectations, not part of the template.
 
@@ -387,6 +375,13 @@ MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints 
 ---
 
 ## What's New
+
+#### v1.2.0
+
+- **Two-state save model** — every version is either **Draft** or **Active** (`TemplateVersion.IsActive`). The editor's footer now has two buttons: **Save Draft** (saves a Draft version) and **Save Version** (saves an Active version), and the version history shows an Active/Draft badge on every version.
+- **Workflow removed (breaking)** — the draft → review → approve → publish state machine is gone: `SubmitForReview`, `Approve`, `Reject`, `CancelReview`, `Publish`, and the server-side draft/auto-save endpoints have been deleted. A draft is now simply a version saved with `isActive:false`.
+- **Promotion format schemaVersion 2 (breaking)** — exports carry per-version `isActive` flags and `schemaVersion: 2`; imports accept only `schemaVersion: 2` (v1 export files are rejected).
+- **Render API contract** — `RenderAsync`/`RenderByNameAsync` now serve the **last Active version** and throw typed exceptions instead of silently rendering a draft: `TemplateNotFoundException`, `TemplateInactiveException` (template switched off), `NoActiveVersionException` (no Active version yet).
 
 #### v1.1.0
 
