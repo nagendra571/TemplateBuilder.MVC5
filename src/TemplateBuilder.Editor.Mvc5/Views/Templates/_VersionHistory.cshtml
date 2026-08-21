@@ -18,6 +18,7 @@ else
                 {
                     <span class="tb-version-badge">Current</span>
                 }
+                <span class="tb-badge @(version.IsActive ? "tb-badge-live" : "tb-badge-draft")">@(version.IsActive ? "Active" : "Draft")</span>
                 <span class="tb-version-meta" style="margin-left:auto;">@version.CreatedAt.ToString("dd MMM yyyy")@(!string.IsNullOrWhiteSpace(version.CreatedBy) ? " · " + version.CreatedBy : "")</span>
             </div>
             @if (!string.IsNullOrWhiteSpace(version.ChangeComment))

@@ -706,7 +706,7 @@ document.getElementById('btn-create-submit')?.addEventListener('click', createTe
 
 // ── Save version ──────────────────────────────────────────────────────────────
 
-async function saveVersion() {
+async function saveVersion(isActive) {
     const btn = document.getElementById('btn-save-version');
     const errorEl = document.getElementById('save-error');
     errorEl.style.display = 'none';
@@ -730,6 +730,7 @@ async function saveVersion() {
                 templateType: document.getElementById('prop-type').value,
                 description: document.getElementById('prop-desc').value,
                 sourceView: document.getElementById('prop-source-view')?.value ?? '',
+                isActive,
                 body,
                 changeComment: document.getElementById('save-comment').value
             })
@@ -737,6 +738,15 @@ async function saveVersion() {
         if (res.ok) {
             const data = await res.json();
             document.getElementById('version-display').textContent = `v${data.versionNumber}`;
+            const existing = document.getElementById('draft-version-badge');
+            if (data.isActive) { if (existing) existing.remove(); }
+            else if (!existing) {
+                const b = document.createElement('span');
+                b.id = 'draft-version-badge';
+                b.className = 'tb-badge tb-badge-draft';
+                b.textContent = 'Draft version';
+                document.getElementById('version-display').after(b);
+            }
             document.getElementById('save-comment').value = '';
             markClean();
             showToast('Version saved');
@@ -1670,7 +1680,8 @@ function updateWordCount() {
 document.getElementById('view-selector')?.addEventListener('change', e => loadViewColumns(e.target.value));
 document.getElementById('btn-history')?.addEventListener('click', openVersionHistory);
 document.getElementById('btn-preview')?.addEventListener('click', openPreview);
-document.getElementById('btn-save-version')?.addEventListener('click', saveVersion);
+document.getElementById('btn-save-draft')?.addEventListener('click', () => saveVersion(false));
+document.getElementById('btn-save-version')?.addEventListener('click', () => saveVersion(true));
 document.getElementById('btn-render')?.addEventListener('click', renderPreview);
 document.getElementById('btn-gen-sample')?.addEventListener('click', () => {
     const ta = document.getElementById('preview-json');

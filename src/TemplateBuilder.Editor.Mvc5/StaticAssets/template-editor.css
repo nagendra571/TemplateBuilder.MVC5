@@ -2032,3 +2032,7 @@
 #tb-editor-host .tb-health-finding--warning { border-color:var(--warning); }
 #tb-editor-host .tb-health-meta { font-size:11px; color:var(--text-muted); margin-top:6px; }
 #tb-editor-host .tb-health-more { font-size:11px; color:var(--text-muted); }
+
+/* ── 37. Two-state save ── */
+#tb-editor-host #draft-version-badge { margin-left: 6px; vertical-align: middle; }
+#tb-editor-host .tb-version-header .tb-badge { margin-left: 6px; }
