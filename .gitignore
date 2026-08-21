@@ -6,3 +6,4 @@ obj/
 nupkg/
 packages/
 .superpowers/
+mono_crash*.json
