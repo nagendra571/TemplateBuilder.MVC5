@@ -33,7 +33,6 @@ public class TemplatePromotionService : ITemplatePromotionService
         var history = await _repository.GetVersionHistoryAsync(templateId, ct);
         return new TemplateExportDocument
         {
-            SchemaVersion = 1,
             Exporter = new ExporterInfo(),
             ExportedAt = DateTime.UtcNow,
             Template = new TemplateExportTemplate
@@ -44,14 +43,14 @@ public class TemplatePromotionService : ITemplatePromotionService
                 Description = template.Description,
                 SampleData = template.SampleData,
                 IsActive = template.IsActive,
-                Status = template.Status.ToString(),
                 Versions = history.OrderBy(v => v.VersionNumber).Select(v => new TemplateExportVersion
                 {
                     VersionNumber = v.VersionNumber,
                     Body = v.Body,
                     ChangeComment = v.ChangeComment,
                     CreatedAt = v.CreatedAt,
-                    CreatedBy = v.CreatedBy
+                    CreatedBy = v.CreatedBy,
+                    IsActive = v.IsActive
                 }).ToList()
             }
         };
@@ -67,9 +66,6 @@ public class TemplatePromotionService : ITemplatePromotionService
         return string.IsNullOrEmpty(cleaned) ? "template" : cleaned;
     }
 
-    public static string CollapseStatus(string exported)
-        => exported == "Published" ? "Published" : "Draft";
-
     public async Task<TemplateImportResult> ImportAsync(byte[] fileBytes, string actor, CancellationToken ct = default)
     {
         var result = new TemplateImportResult();
@@ -83,7 +79,7 @@ public class TemplatePromotionService : ITemplatePromotionService
             result.Errors.Add(new TemplateImportEntry { Reason = "Not a valid template export file (JSON parse failed)." });
             return result;
         }
-        if (doc is null || doc.SchemaVersion > 1)
+        if (doc is null || doc.SchemaVersion != 2)
         {
             result.Errors.Add(new TemplateImportEntry { Reason = $"schemaVersion {doc?.SchemaVersion} not supported." });
             return result;
@@ -115,8 +111,7 @@ public class TemplatePromotionService : ITemplatePromotionService
                 TemplateType = doc.Template.TemplateType,
                 Description = doc.Template.Description,
                 SampleData = doc.Template.SampleData,
-                IsActive = doc.Template.IsActive,
-                Status = Enum.TryParse<TemplateStatus>(CollapseStatus(doc.Template.Status), out var st) ? st : TemplateStatus.Draft
+                IsActive = doc.Template.IsActive
             };
             var versions = doc.Template.Versions.Select(v => new TemplateVersion
             {
@@ -124,7 +119,8 @@ public class TemplatePromotionService : ITemplatePromotionService
                 Body = v.Body,
                 ChangeComment = v.ChangeComment,
                 CreatedAt = v.CreatedAt,
-                CreatedBy = v.CreatedBy
+                CreatedBy = v.CreatedBy,
+                IsActive = v.IsActive
             }).ToList();
             var created = await _promotion.AddWithVersionsAsync(template, versions, ct);
             await _audit.RecordAsync("Template", created.Id, AuditActions.Imported, actor,
@@ -133,25 +129,19 @@ public class TemplatePromotionService : ITemplatePromotionService
             return result;
         }
 
-        if (existing.Status == TemplateStatus.Review || existing.Status == TemplateStatus.Approved)
-        {
-            result.Skipped.Add(new TemplateImportEntry { Name = existing.Name, Reason = $"Target is {existing.Status} (locked)" });
-            return result;
-        }
-
         existing.Name = doc.Template.Name.Trim();
         existing.TemplateType = doc.Template.TemplateType;
         existing.Description = doc.Template.Description;
         existing.SampleData = doc.Template.SampleData;
         existing.IsActive = doc.Template.IsActive;
-        existing.Status = Enum.TryParse<TemplateStatus>(CollapseStatus(doc.Template.Status), out var st2) ? st2 : TemplateStatus.Draft;
 
         var importedVersions = doc.Template.Versions.Select(v => new TemplateVersion
         {
             Body = v.Body,
             ChangeComment = v.ChangeComment is null ? $"Imported from {doc.Exporter.Name} ({doc.ExportedAt:u})" : $"{v.ChangeComment} — imported {doc.ExportedAt:u}",
             CreatedAt = v.CreatedAt,
-            CreatedBy = v.CreatedBy
+            CreatedBy = v.CreatedBy,
+            IsActive = v.IsActive
         }).ToList();
 
         var assigned = await _promotion.UpdateFromImportAsync(existing, importedVersions, ct);

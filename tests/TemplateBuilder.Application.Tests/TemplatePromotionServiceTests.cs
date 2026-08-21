@@ -16,20 +16,20 @@ public class TemplatePromotionServiceTests
         var promo = Substitute.For<ITemplatePromotionRepository>();
         var audit = Substitute.For<IAuditService>();
         var svc = new TemplatePromotionService(repo, promo, audit);
-        repo.GetByIdAsync(7).Returns(new Template { Id = 7, ExternalKey = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Invoice", TemplateType = "Email", Status = TemplateStatus.Published, IsActive = true });
+        repo.GetByIdAsync(7).Returns(new Template { Id = 7, ExternalKey = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Invoice", TemplateType = "Email", IsActive = true });
         repo.GetVersionHistoryAsync(7).Returns(new List<TemplateVersion>
         {
-            new TemplateVersion { VersionNumber = 2, Body = "<p>two</p>", ChangeComment = "c2" },
-            new TemplateVersion { VersionNumber = 1, Body = "<p>one</p>" }
+            new TemplateVersion { VersionNumber = 2, Body = "<p>two</p>", ChangeComment = "c2", IsActive = false },
+            new TemplateVersion { VersionNumber = 1, Body = "<p>one</p>", IsActive = true }
         });
 
         var doc = await svc.BuildExportAsync(7);
 
         doc.Should().NotBeNull();
-        doc!.SchemaVersion.Should().Be(1);
         doc.Exporter.Name.Should().NotBeEmpty();
         doc.Template.Name.Should().Be("Invoice");
-        doc.Template.Status.Should().Be("Published");
+        doc.SchemaVersion.Should().Be(2);
+        doc.Template.Versions.Select(v => v.IsActive).Should().Equal(true, false);
         doc.Template.Versions.Select(v => v.VersionNumber).Should().Equal(1, 2);
     }
 

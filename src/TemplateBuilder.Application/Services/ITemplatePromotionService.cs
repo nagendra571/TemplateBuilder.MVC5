@@ -3,7 +3,7 @@ namespace TemplateBuilder.Application.Services;
 public class ExporterInfo
 {
     public string Name { get; set; } = "TemplateBuilder.Editor.Mvc5";
-    public string Version { get; set; } = "1.1.0";
+    public string Version { get; set; } = "1.2.0";
 }
 
 public class TemplateExportVersion
@@ -13,6 +13,7 @@ public class TemplateExportVersion
     public string? ChangeComment { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
+    public bool IsActive { get; set; } = true;
 }
 
 public class TemplateExportTemplate
@@ -23,13 +24,12 @@ public class TemplateExportTemplate
     public string? Description { get; set; }
     public string? SampleData { get; set; }
     public bool IsActive { get; set; }
-    public string Status { get; set; } = "Draft";
     public List<TemplateExportVersion> Versions { get; set; } = new();
 }
 
 public class TemplateExportDocument
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public ExporterInfo Exporter { get; set; } = new();
     public DateTime ExportedAt { get; set; }
     public TemplateExportTemplate Template { get; set; } = new();

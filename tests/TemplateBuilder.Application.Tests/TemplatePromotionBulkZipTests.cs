@@ -18,7 +18,7 @@ public class TemplatePromotionBulkZipTests
         var audit = Substitute.For<IAuditService>();
         var svc = new TemplatePromotionService(repo, promo, audit);
 
-        repo.GetByIdAsync(1).Returns(new Template { Id = 1, ExternalKey = Guid.NewGuid(), Name = "Invoice v3", TemplateType = "Email", Status = TemplateStatus.Published });
+        repo.GetByIdAsync(1).Returns(new Template { Id = 1, ExternalKey = Guid.NewGuid(), Name = "Invoice v3", TemplateType = "Email" });
         repo.GetVersionHistoryAsync(1).Returns(new List<TemplateVersion> { new TemplateVersion { VersionNumber = 1, Body = "<p>one</p>" } });
         repo.GetByIdAsync(2).Returns((Template?)null);
 
