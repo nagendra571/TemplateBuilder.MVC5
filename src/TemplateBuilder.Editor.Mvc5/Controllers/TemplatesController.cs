@@ -82,17 +82,6 @@ public class TemplatesController : TemplateBuilderControllerBase
                 Description = model.Description
             });
             createdId = template.Id;
-
-            if (!string.IsNullOrWhiteSpace(model.Body))
-            {
-                await _repository.PublishVersionAsync(template.Id, new TemplateVersion
-                {
-                    TemplateId = template.Id,
-                    VersionNumber = 1,
-                    Body = model.Body,
-                    ChangeComment = "Initial version"
-                });
-            }
         }
         catch (DbUpdateException)
         {
@@ -118,6 +107,7 @@ public class TemplatesController : TemplateBuilderControllerBase
             Body = template.CurrentVersion?.Body ?? string.Empty,
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
+            LatestVersionIsActive = template.CurrentVersion?.IsActive ?? true,
             AvailableViews = views.ToList(),
             SampleData = template.SampleData,
             SourceView = template.SourceView
@@ -150,7 +140,8 @@ public class TemplatesController : TemplateBuilderControllerBase
                 TemplateId = id,
                 VersionNumber = nextNumber,
                 Body = request.Body,
-                ChangeComment = request.ChangeComment
+                ChangeComment = request.ChangeComment,
+                IsActive = request.IsActive
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -161,8 +152,9 @@ public class TemplatesController : TemplateBuilderControllerBase
         {
             return JsonError(400, new ErrorResult("VALIDATION_ERROR", $"A template named '{request.Name.Trim()}' already exists."));
         }
-        await _audit.RecordAsync("Template", id, AuditActions.Published, CurrentActor, afterState: JsonConvert.SerializeObject(new { versionNumber = published.VersionNumber, versionId = published.Id }));
-        return JsonOk(new { versionId = published.Id, versionNumber = published.VersionNumber });
+        await _audit.RecordAsync("Template", id, request.IsActive ? AuditActions.Published : AuditActions.DraftSaved, CurrentActor,
+            afterState: JsonConvert.SerializeObject(new { versionNumber = published.VersionNumber, versionId = published.Id, isActive = published.IsActive }));
+        return JsonOk(new { versionId = published.Id, versionNumber = published.VersionNumber, isActive = published.IsActive });
     }
 
     [Route("Templates/{id:int}/Versions")]
@@ -193,13 +185,15 @@ public class TemplatesController : TemplateBuilderControllerBase
         {
             var oldBody = await _repository.GetVersionBodyAsync(versionId);
             if (oldBody is null) return JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", $"Version {versionId} not found."));
+            var source = (await _repository.GetVersionHistoryAsync(id)).FirstOrDefault(v => v.Id == versionId);
             var nextNumber = await _repository.GetNextVersionNumberAsync(id);
             published = await _repository.PublishVersionAsync(id, new TemplateVersion
             {
                 TemplateId = id,
                 VersionNumber = nextNumber,
                 Body = oldBody,
-                ChangeComment = $"Restored from v{sourceVersionNumber}"
+                ChangeComment = $"Restored from v{sourceVersionNumber}",
+                IsActive = source?.IsActive ?? true
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -317,6 +311,7 @@ public class TemplatesController : TemplateBuilderControllerBase
         if (source is null) return HttpNotFound();
 
         var body = source.CurrentVersion?.Body ?? string.Empty;
+        var isActive = source.CurrentVersion?.IsActive ?? true;
         int newId;
         try
         {
@@ -333,7 +328,8 @@ public class TemplatesController : TemplateBuilderControllerBase
                 TemplateId = newTemplate.Id,
                 VersionNumber = 1,
                 Body = body,
-                ChangeComment = $"Duplicated from '{source.Name}'"
+                ChangeComment = $"Duplicated from '{source.Name}'",
+                IsActive = isActive
             });
         }
         catch (DbUpdateException)
