@@ -49,6 +49,7 @@ public static class UnityContainerExtensions
             new HierarchicalLifetimeManager());
 
         TemplateBuilderAuthorizationFilter.Configure(options.Authorization);
+        TemplateBuilderEditorOptions.Current = options;
 
         // Triggers EF6 MigrateDatabaseToLatestVersion on first access — mirrors the ASP.NET Core
         // MigrationHostedService's "migrate on startup" behavior without a hosted-service concept in MVC5.

@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TemplateBuilder.Application
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TemplateBuilder.Infrastructure.EF6.Tests", "tests\TemplateBuilder.Infrastructure.EF6.Tests\TemplateBuilder.Infrastructure.EF6.Tests.csproj", "{FE7F0799-877A-4F09-BBFE-D21D882E2710}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TemplateBuilder.Editor.Mvc5.Tests", "tests\TemplateBuilder.Editor.Mvc5.Tests\TemplateBuilder.Editor.Mvc5.Tests.csproj", "{01FE955D-D882-4789-A256-015E021E5F18}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +60,10 @@ Global
 		{FE7F0799-877A-4F09-BBFE-D21D882E2710}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE7F0799-877A-4F09-BBFE-D21D882E2710}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE7F0799-877A-4F09-BBFE-D21D882E2710}.Release|Any CPU.Build.0 = Release|Any CPU
+		{01FE955D-D882-4789-A256-015E021E5F18}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{01FE955D-D882-4789-A256-015E021E5F18}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{01FE955D-D882-4789-A256-015E021E5F18}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{01FE955D-D882-4789-A256-015E021E5F18}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2399FD4A-8118-4090-8DBB-0D901C47F847} = {E06BDB14-BF4D-4C64-BC66-AE145EC5702C}
@@ -67,5 +73,6 @@ Global
 		{E56133F9-916F-4E25-818C-C5AF40381266} = {50B83682-62B6-48CC-9A88-0CAEFEAC4D92}
 		{C570307B-CCEF-4791-980E-092316436F49} = {50B83682-62B6-48CC-9A88-0CAEFEAC4D92}
 		{FE7F0799-877A-4F09-BBFE-D21D882E2710} = {50B83682-62B6-48CC-9A88-0CAEFEAC4D92}
+		{01FE955D-D882-4789-A256-015E021E5F18} = {50B83682-62B6-48CC-9A88-0CAEFEAC4D92}
 	EndGlobalSection
 EndGlobal
