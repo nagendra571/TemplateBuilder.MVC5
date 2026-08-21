@@ -1,6 +1,6 @@
 # TemplateBuilder.Editor.Mvc5
 
-**Current version: 1.2.0**
+**Current version: 1.3.0**
 
 Embed a full Scriban-powered HTML template management UI into any ASP.NET MVC 5 application running on .NET Framework 4.8. Install the package, register a Unity container, wire up two routes — and your users can create, edit, version, compare, preview, and restore templates with reusable snippets, all wrapped in your own site layout.
 
@@ -196,6 +196,42 @@ The filter applies to every editor controller — the full route surface (`/Temp
 
 ---
 
+## Author Identity (CreatedBy)
+
+Every TemplateBuilder table that records an author (`TemplateVersion.CreatedBy`,
+`SnippetVersion.CreatedBy`, snippet usage `UsedBy`, and the audit log `Actor`) is stamped
+with the current user (imported template versions keep their original author from the
+export file), resolved in this order:
+
+1. **`options.ActorResolver`** (your custom resolver, if set)
+2. `User.Identity.Name`
+3. `"anonymous"`
+
+Without configuration the editor stores `User.Identity.Name` (or `"anonymous"` when the
+request is unauthenticated or the name is empty). Existing records are never backfilled —
+legacy rows display `"anonymous"` in the UI.
+
+Supply your own identity from your existing `RegisterTemplateBuilderEditor` call — e.g. a
+claims value:
+
+```csharp
+container.RegisterTemplateBuilderEditor(options =>
+{
+    options.ConnectionString = connectionString;
+    // Store the "sub" claim (or any claim / custom user lookup) as the author
+    options.ActorResolver = ctx => ctx.User?.FindFirst("sub")?.Value;
+});
+```
+
+The resolver receives the request's `HttpContextBase`, so it can read claims, session, or
+any of your own services captured in the closure. It runs once per request; a `null` or
+blank result falls back to the chain below it. Values are stored as returned — trim
+inside the resolver if your source may carry stray whitespace. The stored value is
+truncated to 200 characters (the column limit). Exceptions thrown by your resolver
+propagate.
+
+---
+
 ## Setup Diagnostic Page
 
 After installation, navigate to **`/Templates/_setup`** (requires `<compilation debug="true" />`; returns 404 otherwise) to verify every integration requirement at once:
@@ -375,6 +411,14 @@ MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints 
 ---
 
 ## What's New
+
+#### v1.3.0
+
+- New `TemplateBuilderEditorOptions.ActorResolver` — supply your own author identity
+  (claims, user id, username) stored as `CreatedBy` / audit `Actor`. Falls back to
+  `User.Identity.Name`, then `"anonymous"`. Legacy null values now display "anonymous".
+- Template version history now stamps `CreatedBy` on every save (previously never
+  populated); existing versions are not backfilled.
 
 #### v1.2.0
 

@@ -1927,7 +1927,7 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
                         <button type="button" class="btn btn-sm btn-primary" data-restore-version="${v.id}">Restore</button>
                     </div>
                     ${v.changeComment ? `<div class="tb-version-comment">${escapeHtml(v.changeComment)}</div>` : ''}
-                    <div class="tb-version-meta">${escapeHtml(v.createdBy || '')} · ${new Date(v.createdAt).toLocaleString()}</div>
+                    <div class="tb-version-meta">${escapeHtml(v.createdBy || 'anonymous')} · ${new Date(v.createdAt).toLocaleString()}</div>
                 </div>`).join('');
         } catch {
             content.innerHTML = '<p style="color:var(--danger)">Network error loading snippet history.</p>';

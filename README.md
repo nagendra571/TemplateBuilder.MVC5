@@ -32,3 +32,11 @@ docs/superpowers/plans/                   implementation plan
 - .NET SDK (for `dotnet build`/`test` against the SDK-style `src/`/`tests/` projects)
 - Visual Studio (for the EF6 Package Manager Console migration commands, and for building/running `samples/TemplateBuilder.SampleMvc5Host`, which is an old-style MVC5 Web Application project — not buildable via plain `dotnet build`)
 - SQL Server / LocalDB (for `Infrastructure.EF6.Tests` and the sample host)
+
+## Customizing the author identity
+
+Consumers supply their own user identity (claims, user id, etc.) via
+`options.ActorResolver` in `RegisterTemplateBuilderEditor` — see the package README's
+"Author Identity (CreatedBy)" section. Values flow to `TemplateVersion.CreatedBy`,
+`SnippetVersion.CreatedBy`, snippet usage, and audit rows; the fallback chain is
+resolver → `User.Identity.Name` → `"anonymous"`.
