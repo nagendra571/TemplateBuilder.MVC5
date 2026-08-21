@@ -4,6 +4,14 @@ Persistent cross-session memory for agents working in this repo. Maintained via 
 
 ## Memories
 
+### 2026-08-21: Connection-string fix (v1.3.1) — EF6 runtime migrations bypass the design-time factory
+
+- Client bug: "No connection string named 'TemplateBuilderDbContext' could be found" despite `options.ConnectionString` being set. Root cause: EF6's `DbMigrator` (inside `MigrateDatabaseToLatestVersion`) discovers `IDbContextFactory<T>` **by convention** (`{ContextName}Factory` in the context's assembly) at RUNTIME; `TemplateBuilderDbContextFactory.Create()` hardcoded `"name=TemplateBuilderDbContext"` (a design-time-only assumption). The sample host masked the bug by shipping BOTH connection strings in web.config.
+- Fix: `TemplateBuilderDbContextFactory.ConnectionStringProvider` (public static `Func<string>?`), set by `RegisterTemplateBuilderEditor` to `options.ConnectionString`; `Create()` uses it when set, falls back to the named string (design time — PM console tooling unchanged). Regression tests: `ConnectionStringResolutionTests` (3 tests, `[Collection("Database")]`).
+- **Rejected approach (lesson):** a `DbConfiguration`-derived class with `SetContextFactory` — DbConfiguration is a per-AppDomain singleton instantiated on FIRST EF use, so provider-set timing is order-dependent (works in isolation, fails in a full test run). A provider read at factory-`Create()` time is order-independent.
+- xsp rebuild recipe corrections: `AssemblyInfo.cs.in` uses `@XSP_VERSION@` delimiters (sed to `4.6.0.0`); `AssemblyInfo4.cs.in` lives in `src/Mono.WebServer/` (plain `cp`); `SignAssembly=false` in both csprojs. First xbuild error "CS2001 AssemblyInfo4.cs" → generate it before building XSP.
+- Docker `mssql-tb` can exit silently (Exited 255) — check `docker ps` before blaming test failures: `SNI_ERROR_40` (connection-level) means the server is down, not the test.
+
 ### 2026-08-21: Origin handoff batch 3 — Actor Resolver (v2.3.0)
 
 - Handoff docs for the origin agent (in THIS repo's `docs/superpowers/`): `2026-08-21-origin-actor-resolver-design.md` (decisions R1–R13), `-implementation.md` (5 TDD tasks), `handoff/2026-08-21-origin-actor-resolver-implementation-prompt.md`. Feature: `TemplateBuilderEditorOptions.ActorResolver` (`Func<HttpContext, string?>`) → `CreatedBy`/audit `Actor`, fallback chain, no backfill, 2.3.0.
