@@ -1,6 +1,6 @@
 # TemplateBuilder.Editor.Mvc5
 
-**Current version: 1.3.0**
+**Current version: 1.3.2**
 
 Embed a full Scriban-powered HTML template management UI into any ASP.NET MVC 5 application running on .NET Framework 4.8. Install the package, register a Unity container, wire up two routes — and your users can create, edit, version, compare, preview, and restore templates with reusable snippets, all wrapped in your own site layout.
 
@@ -387,6 +387,23 @@ Available methods: `RenderAsync(templateId, model)`, `RenderByNameAsync(name, mo
 
 `RegisterTemplateBuilderEditor()` runs EF6 `MigrateDatabaseToLatestVersion` on first access — migrations are bundled with the package. No manual migration steps are required.
 
+### DBA-managed database (app login is DML-only)
+
+If your SQL login has no DDL rights (no `CREATE TABLE`/`ALTER` — a common enterprise constraint), the app cannot run migrations. Instead:
+
+1. **Provision the schema once** — the package installs a generated SQL script into your project's `Scripts\` folder: `TemplateBuilder.schema.<version>.sql` (e.g. `TemplateBuilder.schema.1.3.2.sql`). Have your DBA run it against the target database. The script is generated from the package's EF6 migration chain, creates all tables and indexes, and records the migration history so the app considers the database up to date.
+2. **Tell the package not to touch DDL** — in `RegisterTemplateBuilderEditor`:
+
+```csharp
+options.ApplyMigrations = false;
+```
+
+With `ApplyMigrations = false` the package installs no database initializer and never attempts DDL — the app login needs only DML (SELECT/INSERT/UPDATE/DELETE).
+
+3. **Upgrading a DBA-managed database** — every release ships a new versioned script (e.g. `TemplateBuilder.schema.1.3.3.sql`); have the DBA run the new file against the existing database. The runtime never runs migrations on its own.
+
+Note: if you use the Package Manager Console (`Update-Database` / `Add-Migration`) for design-time tooling, that still requires a connection string named `TemplateBuilderDbContext` in your `Web.config`, as documented in the v1.3.1 notes.
+
 ---
 
 ## Static Assets
@@ -411,6 +428,15 @@ MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints 
 ---
 
 ## What's New
+
+#### v1.3.2
+
+- **DBA-managed databases** — new `TemplateBuilderEditorOptions.ApplyMigrations` (default
+  `true`). Set it to `false` and the package never runs migrations and never attempts DDL —
+  for SQL logins with DML-only rights. The package now ships a generated schema script
+  (`content/Scripts/TemplateBuilder.schema.<version>.sql`) that a DBA runs once to
+  provision the database (all tables, indexes, and migration-history rows; generated from
+  the migration chain so it cannot drift). Upgrades ship a new versioned script file.
 
 #### v1.3.1
 
