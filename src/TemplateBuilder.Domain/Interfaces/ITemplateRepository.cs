@@ -6,6 +6,7 @@ public interface ITemplateRepository
     Task<Template?> GetByIdAsync(int id, CancellationToken ct = default);
     Task<Template?> GetByNameAsync(string name, CancellationToken ct = default);
     Task<int?> GetCurrentVersionIdAsync(int templateId, CancellationToken ct = default);
+    Task<TemplateVersion?> GetLastActiveVersionAsync(int templateId, CancellationToken ct = default);
     Task<string?> GetVersionBodyAsync(int versionId, CancellationToken ct = default);
     Task<IReadOnlyList<Template>> GetAllAsync(CancellationToken ct = default);
     Task<IReadOnlyList<TemplateVersion>> GetVersionHistoryAsync(int templateId, CancellationToken ct = default);

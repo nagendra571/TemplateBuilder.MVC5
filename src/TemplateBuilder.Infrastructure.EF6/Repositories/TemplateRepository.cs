@@ -30,6 +30,12 @@ public class TemplateRepository : ITemplateRepository
         return version?.Body;
     }
 
+    public async Task<TemplateVersion?> GetLastActiveVersionAsync(int templateId, CancellationToken ct = default)
+        => await _db.TemplateVersions
+            .Where(v => v.TemplateId == templateId && v.IsActive)
+            .OrderByDescending(v => v.VersionNumber)
+            .FirstOrDefaultAsync(ct);
+
     public async Task<IReadOnlyList<Template>> GetAllAsync(CancellationToken ct = default)
         => await _db.Templates.Include(t => t.CurrentVersion).OrderBy(t => t.Name).ToListAsync(ct);
 

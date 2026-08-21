@@ -9,5 +9,6 @@ public class TemplateVersion
     public string? ChangeComment { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? CreatedBy { get; set; }
+    public bool IsActive { get; set; } = true;
     public Template Template { get; set; } = null!;
 }

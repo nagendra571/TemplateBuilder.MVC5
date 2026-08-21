@@ -20,6 +20,7 @@ public class InterfaceContractTests
             "GetByIdAsync",
             "GetByNameAsync",
             "GetCurrentVersionIdAsync",
+            "GetLastActiveVersionAsync",
             "GetVersionBodyAsync",
             "GetAllAsync",
             "GetVersionHistoryAsync",
