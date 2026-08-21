@@ -60,10 +60,17 @@ public static class UnityContainerExtensions
         // named 'TemplateBuilderDbContext' could be found in the application config file."
         TemplateBuilderDbContextFactory.ConnectionStringProvider = () => options.ConnectionString;
 
+        // options.ApplyMigrations=false: DBA-managed database — the schema is provisioned by the
+        // shipped script (content/Scripts), so no initializer is installed and DDL is never attempted.
+        TemplateBuilderDbContext.MigrationsEnabled = options.ApplyMigrations;
+
         // Triggers EF6 MigrateDatabaseToLatestVersion on first access — mirrors the ASP.NET Core
         // MigrationHostedService's "migrate on startup" behavior without a hosted-service concept in MVC5.
-        using var migrationContext = new TemplateBuilderDbContext(connectionString);
-        migrationContext.Database.Initialize(force: false);
+        if (options.ApplyMigrations)
+        {
+            using var migrationContext = new TemplateBuilderDbContext(connectionString);
+            migrationContext.Database.Initialize(force: false);
+        }
 
         return container;
     }

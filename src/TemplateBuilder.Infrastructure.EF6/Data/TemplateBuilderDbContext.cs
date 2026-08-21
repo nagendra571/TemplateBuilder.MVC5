@@ -7,9 +7,19 @@ namespace TemplateBuilder.Infrastructure.EF6.Data;
 
 public class TemplateBuilderDbContext : DbContext
 {
+    // Set by RegisterTemplateBuilderEditor to honor options.ApplyMigrations. When false,
+    // NO database initializer is installed, so EF6 never attempts DDL (CREATE TABLE, ALTER,
+    // indexes) — required for DBA-managed databases where the app login is DML-only and the
+    // schema is provisioned by the shipped schema script (content/Scripts in the package).
+    // The flag is read in the constructor because every context construction re-applies the
+    // initializer; a registration-time SetInitializer override alone would not survive it.
+    public static bool MigrationsEnabled { get; set; } = true;
+
     public TemplateBuilderDbContext(string connectionString) : base(connectionString)
     {
-        Database.SetInitializer(new MigrateDatabaseToLatestVersion<TemplateBuilderDbContext, Migrations.Configuration>());
+        Database.SetInitializer(MigrationsEnabled
+            ? new MigrateDatabaseToLatestVersion<TemplateBuilderDbContext, Migrations.Configuration>()
+            : null);
     }
 
     public DbSet<Template> Templates { get; set; } = null!;
