@@ -172,7 +172,7 @@ public class TemplatePromotionService : ITemplatePromotionService
             }
             var manifest = archive.CreateEntry("_summary.json");
             using (var writer = new StreamWriter(manifest.Open()))
-                await writer.WriteAsync(JsonConvert.SerializeObject(new { schemaVersion = 1, exportedAt = DateTime.UtcNow, files = summary }, CamelJson));
+                await writer.WriteAsync(JsonConvert.SerializeObject(new { schemaVersion = 2, exportedAt = DateTime.UtcNow, files = summary }, CamelJson));
         }
         return ms.ToArray();
     }

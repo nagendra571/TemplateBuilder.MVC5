@@ -173,24 +173,6 @@
 }
 #tb-editor-host .tb-theme-toggle:hover { color: var(--text); border-color: var(--accent); }
 
-/* Auto-save toggle */
-#tb-editor-host .tb-autosave-toggle {
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
-    font-family: inherit;
-    padding: 2px 8px;
-    white-space: nowrap;
-    transition: color var(--transition), border-color var(--transition), opacity var(--transition);
-}
-#tb-editor-host .tb-autosave-toggle.tb-autosave-on  { border-color: var(--success); color: var(--success); }
-#tb-editor-host .tb-autosave-toggle.tb-autosave-off { border-color: var(--border); color: var(--text-muted); opacity: .6; }
-#tb-editor-host .tb-autosave-toggle:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
-
 /* ── 4. Badges ───────────────────────────────────────────────── */
 
 #tb-editor-host .tb-badge {
@@ -681,13 +663,6 @@
 }
 
 /* ── 16. State Banners ───────────────────────────────────────── */
-
-/* Draft recovery banner */
-#tb-editor-host .tb-draft-banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--warning-bg); border-bottom: 1px solid var(--warning-border); border-left: 3px solid var(--warning); font-size: 13px; color: var(--warning); flex-wrap: wrap; flex-shrink: 0; }
-#tb-editor-host .tb-draft-banner[hidden] { display: none; }
-#tb-editor-host .tb-draft-banner-icon { font-size: 14px; flex-shrink: 0; }
-#tb-editor-host .tb-draft-banner-text { flex: 1; min-width: 180px; color: var(--text-muted); font-size: 13px; }
-#tb-editor-host .tb-draft-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* Validate panel */
 #tb-editor-host .tb-validate-panel { display: flex; align-items: center; gap: 8px; padding: 9px 14px; font-size: 13px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
@@ -1491,18 +1466,11 @@
 #tb-editor-host .tb-ref-item-code { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
 #tb-editor-host .tb-ref-item-output { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
 
-/* ── 33. Governance — status pill, lock banner, workflow actions, timeline ─── */
+/* ── 33. Governance — banner ─── */
 
-#tb-editor-host .tb-status-pill { display:inline-block; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
-#tb-editor-host .tb-status-pill[data-status="Draft"]     { background:#33507a; color:#cfe0ff; }
-#tb-editor-host .tb-status-pill[data-status="Review"]    { background:#7a5c2a; color:#ffe2b0; }
-#tb-editor-host .tb-status-pill[data-status="Approved"]  { background:#2a6a4a; color:#c0ffdd; }
-#tb-editor-host .tb-status-pill[data-status="Published"] { background:#2a6a4a; color:#c0ffdd; }
 #tb-editor-host .tb-banner { border-radius:6px; padding:8px 12px; font-size:13px; margin:8px 0; }
 #tb-editor-host .tb-banner--lock { background:#3a2a10; border:1px solid #e8a13c; color:#e8c07a; }
 #tb-editor-host .tb-banner--info { background:#10243e; border:1px solid #2a5a8a; color:#bcd8f5; }
-#tb-editor-host .tb-editor-locked { pointer-events:none; opacity:.7; }
-#tb-editor-host .tb-workflow-actions { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
 /* ── 34. Activity drawer (Edit page) ────────────────────────────
    The drawer + tab are absolutely positioned inside .tb-editor-grid, so they
    never participate in grid flow — the 3-panel workspace can't be squeezed
@@ -1656,7 +1624,6 @@
 #tb-editor-host .tb-snippet-meta { font-size:11px; color: var(--text-muted); display:block; }
 
 /* Hidden-state overrides (display:flex/block would otherwise defeat [hidden]) */
-#tb-editor-host .tb-workflow-actions[hidden],
 #tb-editor-host .tb-banner[hidden] { display: none; }
 
 /* Approve button (workflow group) */

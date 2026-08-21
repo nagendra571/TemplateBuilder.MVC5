@@ -203,7 +203,7 @@ Plan deviations worth knowing (also in MEMORY.md):
 
 ## 2026-08-21 — v1.2.0 two-state save model (Tasks 1-8 of the two-state-save plan)
 
-Gate table — actual command outputs from the task reports; Task 8 not yet run.
+Gate table — actual command outputs from the task reports.
 
 | # | Gate | Command | Result (from task report) |
 |---|---|---|---|
@@ -221,4 +221,4 @@ Gate table — actual command outputs from the task reports; Task 8 not yet run.
 | 6 | JS syntax | `node --check src/TemplateBuilder.Editor.Mvc5/StaticAssets/template-editor.js` | exit 0, no output |
 | 6 | Editor build | as Task 5 | 0 Errors, 21 warnings (all pre-existing); codegen contains `btn-save-draft` / `tb-badge-live` |
 | 7 | Version + docs | csproj `<Version>` + README/PROGRESS/MEMORY | `1.2.0` (this task, verified by grep); docs updated |
-| 8 | End-to-end smoke | Task 8 gate commands | executed in Task 8 |
+| 8 | End-to-end smoke | build + xsp4 curl smoke + agent-browser | build 0 errors; Domain 19/19, Application 72/72, EF6 41/41; 12/12 curl smoke; 4/4 agent-browser flows; nupkg 1.2.0 inspected (no .cshtml leakage); workflow routes 404; dev-API harness verified typed exceptions against packaged DLLs |

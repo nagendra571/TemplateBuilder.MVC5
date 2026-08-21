@@ -445,7 +445,6 @@
 
 <script>
     const templateId = @(Model.Id ?? 0);
-    const currentVersionNumber = @Model.CurrentVersionNumber;
     let savedSampleData = @Html.Raw(Json.Encode(Model.SampleData));
     window.tbTemplateId = @(Model.Id ?? 0);
     window.tbIsCreate = @(Model.Id.HasValue ? "false" : "true");
