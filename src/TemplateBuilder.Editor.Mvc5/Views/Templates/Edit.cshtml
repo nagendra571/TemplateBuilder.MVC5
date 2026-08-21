@@ -58,18 +58,7 @@
                 <div class="tb-panel-heading">
                     <span class="tb-heading-icon">&#9998;</span> CANVAS
                     <div class="tb-heading-actions">
-                        <button type="button" id="btn-autosave-toggle" class="tb-autosave-toggle" aria-label="Toggle auto-save"></button>
                         <button type="button" id="btn-theme-toggle" class="tb-theme-toggle" aria-label="Toggle theme"></button>
-                    </div>
-                </div>
-                <div id="tb-lock-banner" class="tb-banner tb-banner--lock" hidden></div>
-                <div id="tb-review-comment" class="tb-banner tb-banner--info" hidden></div>
-                <div id="tb-draft-banner" class="tb-draft-banner" hidden role="alert">
-                    <span class="tb-draft-banner-icon">&#128190;</span>
-                    <span class="tb-draft-banner-text">Unsaved draft found (<span id="draft-age"></span>). Restore it or discard to keep the current saved version.</span>
-                    <div class="tb-draft-banner-actions">
-                        <button type="button" id="btn-draft-restore" class="btn btn-sm btn-primary">Restore draft</button>
-                        <button type="button" id="btn-draft-discard" class="btn btn-sm btn-secondary">Discard</button>
                     </div>
                 </div>
                 <div id="validate-panel" class="tb-validate-panel" hidden>
@@ -85,7 +74,6 @@
                     <span>Characters: <strong id="wc-chars">0</strong></span>
                     <span class="tb-wc-sep">&#183;</span>
                     <span>No spaces: <strong id="wc-nospace">0</strong></span>
-                    <span id="wc-draft-status" class="tb-draft-status"></span>
                 </div>
             </div>
 
@@ -139,14 +127,6 @@
                     }
                 </div>
                 <div class="tb-props-footer">
-                    <span id="tb-status-pill" class="tb-status-pill" data-status="@Model.Status">@Model.Status</span>
-                    <div id="tb-workflow-actions" class="tb-workflow-actions" data-template-id="@Model.Id" data-status="@Model.Status" hidden>
-                        <button type="button" id="btn-submit-review" class="btn btn-primary">Submit for review</button>
-                        <button type="button" id="btn-approve" class="btn btn-success">Approve</button>
-                        <button type="button" id="btn-reject" class="btn btn-danger">Reject with feedback</button>
-                        <button type="button" id="btn-cancel-review" class="btn btn-ghost">Cancel review</button>
-                        <button type="button" id="btn-publish" class="btn btn-primary">Publish</button>
-                    </div>
                     <div id="save-error" class="tb-error-msg" role="alert" style="display:none;"></div>
                     @if (Model.Id.HasValue)
                     {
@@ -462,8 +442,6 @@
     const templateId = @(Model.Id ?? 0);
     const currentVersionNumber = @Model.CurrentVersionNumber;
     let savedSampleData = @Html.Raw(Json.Encode(Model.SampleData));
-    window.tbStatus = '@Model.Status';
     window.tbTemplateId = @(Model.Id ?? 0);
-    window.tbReviewComment = '@(Html.Raw(System.Web.HttpUtility.JavaScriptStringEncode(Model.ReviewComment ?? string.Empty)))';
     window.tbIsCreate = @(Model.Id.HasValue ? "false" : "true");
 </script>

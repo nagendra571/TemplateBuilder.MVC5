@@ -25,7 +25,7 @@ public class TemplatePromotionRepositoryTests
         using var ctx = CreateContext();
         var repo = new TemplatePromotionRepository(ctx);
         var t = await repo.AddWithVersionsAsync(
-            new Template { Name = "P", TemplateType = "Email", ExternalKey = Guid.NewGuid(), Status = TemplateStatus.Published },
+            new Template { Name = "P", TemplateType = "Email", ExternalKey = Guid.NewGuid() },
             new List<TemplateVersion>
             {
                 new TemplateVersion { VersionNumber = 1, Body = "<p>one</p>" },
@@ -41,7 +41,7 @@ public class TemplatePromotionRepositoryTests
         using var ctx = CreateContext();
         var repo = new TemplatePromotionRepository(ctx);
         var t = await repo.AddWithVersionsAsync(
-            new Template { Name = "P", TemplateType = "Email", ExternalKey = Guid.NewGuid(), Status = TemplateStatus.Published },
+            new Template { Name = "P", TemplateType = "Email", ExternalKey = Guid.NewGuid() },
             new List<TemplateVersion> { new TemplateVersion { VersionNumber = 1, Body = "one" } });
         var assigned = await repo.AppendVersionsAsync(t.Id, new List<TemplateVersion>
         {

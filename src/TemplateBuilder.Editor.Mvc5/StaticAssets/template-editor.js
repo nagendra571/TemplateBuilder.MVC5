@@ -54,8 +54,6 @@ function actionKind(action) {
 
 let _isDirty = false;
 function markDirty() {
-    const st = window.tbStatus;
-    if (st === 'Review' || st === 'Approved') return;
     _isDirty = true;
 }
 function markClean() { _isDirty = false; }
@@ -740,7 +738,6 @@ async function saveVersion() {
             const data = await res.json();
             document.getElementById('version-display').textContent = `v${data.versionNumber}`;
             document.getElementById('save-comment').value = '';
-            clearDraft();
             markClean();
             showToast('Version saved');
         } else {
@@ -811,7 +808,6 @@ async function restoreVersion(btn, versionId, sourceVersionNumber) {
             headers: { 'RequestVerificationToken': _csrf }
         });
         if (res.ok) {
-            clearDraft();
             window.location.reload();
         } else {
             const err = await res.json().catch(() => null);
@@ -906,7 +902,6 @@ async function restoreFromCompare(btn, versionId, sourceVersionNumber) {
             headers: { 'RequestVerificationToken': _csrf }
         });
         if (res.ok) {
-            clearDraft();
             window.location.reload();
         } else {
             const err = await res.json().catch(() => null);
@@ -2081,97 +2076,6 @@ document.getElementById('editor-form')?.addEventListener('submit', () => {
     loadSnippets();
 })();
 
-// ── Workflow ────────────────────────────────────────────────────────────────
-const tbStatus = window.tbStatus || 'Draft';
-const isLocked = tbStatus === 'Review' || tbStatus === 'Approved';
-
-function updateWorkflowUI() {
-    const group = document.getElementById('tb-workflow-actions');
-    if (!group) return;
-    group.hidden = window.tbIsCreate;
-    group.dataset.status = tbStatus;
-    document.getElementById('btn-submit-review')?.toggleAttribute('hidden', tbStatus !== 'Draft');
-    document.getElementById('btn-approve')?.toggleAttribute('hidden', tbStatus !== 'Review');
-    document.getElementById('btn-reject')?.toggleAttribute('hidden', tbStatus !== 'Review');
-    document.getElementById('btn-cancel-review')?.toggleAttribute('hidden', !(tbStatus === 'Review' || tbStatus === 'Approved'));
-    document.getElementById('btn-publish')?.toggleAttribute('hidden', tbStatus !== 'Approved');
-
-    const pill = document.getElementById('tb-status-pill');
-    if (pill) { pill.dataset.status = tbStatus; pill.textContent = tbStatus; }
-
-    const banner = document.getElementById('tb-lock-banner');
-    const comment = document.getElementById('tb-review-comment');
-    if (isLocked) {
-        if (banner) {
-            banner.hidden = false;
-            banner.textContent = tbStatus === 'Review'
-                ? 'This template is under review — editing is locked until it is approved or rejected.'
-                : 'This template is approved — editing is locked. Publish to make it live.';
-        }
-        if (comment && window.tbReviewComment) {
-            comment.hidden = false;
-            comment.textContent = 'Review feedback: ' + window.tbReviewComment;
-        }
-        if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(true);
-        else document.querySelector('.sun-editor')?.classList.add('tb-editor-locked');
-    } else {
-        if (banner) banner.hidden = true;
-        if (comment) {
-            comment.hidden = !window.tbReviewComment;
-            if (window.tbReviewComment) comment.textContent = 'Review feedback: ' + window.tbReviewComment;
-        }
-        if (typeof _editor?.setReadOnly === 'function') _editor.setReadOnly(false);
-        else document.querySelector('.sun-editor')?.classList.remove('tb-editor-locked');
-    }
-    document.getElementById('btn-create-submit')?.toggleAttribute('hidden', !window.tbIsCreate || isLocked);
-    document.getElementById('btn-save-version')?.toggleAttribute('hidden', isLocked);
-    document.getElementById('btn-preview')?.toggleAttribute('hidden', isLocked);
-}
-
-async function workflowFetch(url, body) {
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
-        body: body ? JSON.stringify(body) : undefined
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        showToast(err.message || 'Action failed');
-        return null;
-    }
-    return res.json();
-}
-
-document.getElementById('btn-submit-review')?.addEventListener('click', async () => {
-    const body = _editor?.getContents() ?? '';
-    if (!body.trim()) { showToast('Template body is empty.'); return; }
-    const ok = await workflowFetch(`/Templates/${templateId}/SubmitForReview`, { body });
-    if (ok) { showToast('Submitted for review.'); markClean(); location.reload(); }
-});
-
-document.getElementById('btn-approve')?.addEventListener('click', async () => {
-    const ok = await workflowFetch(`/Templates/${templateId}/Approve`);
-    if (ok) { showToast('Approved — ready to publish.'); markClean(); location.reload(); }
-});
-
-document.getElementById('btn-reject')?.addEventListener('click', async () => {
-    const comment = prompt('Rejection feedback (optional):');
-    if (comment === null) return;
-    const ok = await workflowFetch(`/Templates/${templateId}/Reject`, { comment });
-    if (ok) { showToast('Rejected — template returned to draft.'); markClean(); location.reload(); }
-});
-
-document.getElementById('btn-cancel-review')?.addEventListener('click', async () => {
-    const ok = await workflowFetch(`/Templates/${templateId}/CancelReview`);
-    if (ok) { showToast('Review cancelled — editing unlocked.'); markClean(); location.reload(); }
-});
-
-document.getElementById('btn-publish')?.addEventListener('click', async () => {
-    if (!confirm('Publish the approved body as a new version?')) return;
-    const ok = await workflowFetch(`/Templates/${templateId}/Publish`);
-    if (ok) { showToast('Published.'); markClean(); location.reload(); }
-});
-
 // Activity drawer (Edit page)
 let _activityDrawerOpen = false;
 
@@ -2247,7 +2151,6 @@ async function loadTimeline() {
     });
 }
 
-updateWorkflowUI();
 loadTimeline();
 
 // ── Special characters picker ─────────────────────────────────────────────────
@@ -2559,108 +2462,6 @@ loadTimeline();
     window._closeFindReplace  = closeFindReplace;
     window._isFindReplaceOpen = () => !panel.hidden;
 })();
-
-// ── Auto-save draft (server-first; localStorage kept as crash-recovery cache) ─
-
-const editorTemplateId = (typeof templateId !== 'undefined' ? templateId : (window.tbTemplateId || 0));
-const DRAFT_KEY         = `tb-draft-${editorTemplateId}`;
-const AUTOSAVE_PREF_KEY = 'tb-autosave-enabled';
-const AUTOSAVE_INTERVAL = 60_000;
-
-function isAutoSaveEnabled() {
-    return localStorage.getItem(AUTOSAVE_PREF_KEY) === 'true';
-}
-
-function updateAutoSaveToggle() {
-    const btn = document.getElementById('btn-autosave-toggle');
-    if (!btn) return;
-    const on = isAutoSaveEnabled();
-    btn.textContent = on ? '⏳ Auto-save: ON' : '⏳ Auto-save: OFF';
-    btn.title = on ? 'Auto-save is on — click to disable' : 'Auto-save is off — click to enable';
-    btn.classList.toggle('tb-autosave-on',  on);
-    btn.classList.toggle('tb-autosave-off', !on);
-}
-
-function updateDraftStatus() {
-    const el = document.getElementById('wc-draft-status');
-    if (!el) return;
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) { el.textContent = ''; return; }
-    try {
-        const { timestamp } = JSON.parse(raw);
-        const mins = Math.round((Date.now() - timestamp) / 60000);
-        el.textContent = mins < 1 ? 'Draft saved just now' : `Draft saved ${mins}m ago`;
-    } catch { el.textContent = ''; }
-}
-
-function clearDraft() {
-    localStorage.removeItem(DRAFT_KEY);
-    const el = document.getElementById('wc-draft-status');
-    if (el) el.textContent = '';
-}
-
-async function saveDraft() {
-    if (!_isDirty || !isAutoSaveEnabled() || !_editor) return;
-    const body = _editor.getContents();
-    const sampleData = document.getElementById('preview-json')?.value ?? null;
-    try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ body, sampleData, timestamp: Date.now(), versionNumber: currentVersionNumber }));
-        updateDraftStatus();
-        if (templateId > 0 && tbStatus !== 'Review' && tbStatus !== 'Approved') {
-            const res = await fetch(`/Templates/${templateId}/Draft`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': _csrf },
-                body: JSON.stringify({ body })
-            });
-            if (!res.ok && res.status !== 409) {
-                const err = await res.json().catch(() => ({}));
-                console.warn('Draft save failed:', err.message || res.status);
-            }
-        }
-    } catch { /* storage or network failure — silently skip */ }
-}
-
-function loadDraft() {
-    if (templateId === null) return;
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return;
-    try {
-        const draft = JSON.parse(raw);
-        if (draft.versionNumber !== currentVersionNumber) { clearDraft(); return; }
-        const banner = document.getElementById('tb-draft-banner');
-        if (!banner) return;
-        const ageEl = document.getElementById('draft-age');
-        if (ageEl) {
-            const mins = Math.round((Date.now() - draft.timestamp) / 60000);
-            ageEl.textContent = mins < 1 ? 'just now' : `${mins} min ago`;
-        }
-        banner.hidden = false;
-        document.getElementById('btn-draft-restore')?.addEventListener('click', () => {
-            _editor.setContents(draft.body);
-            const pv = document.getElementById('preview-json');
-            if (pv && draft.sampleData) pv.value = draft.sampleData;
-            markDirty();
-            updateWordCount();
-            clearDraft();
-            banner.hidden = true;
-            showToast('Draft restored — remember to save when ready');
-        }, { once: true });
-        document.getElementById('btn-draft-discard')?.addEventListener('click', () => {
-            clearDraft();
-            banner.hidden = true;
-        }, { once: true });
-    } catch { clearDraft(); }
-}
-
-document.getElementById('btn-autosave-toggle')?.addEventListener('click', () => {
-    localStorage.setItem(AUTOSAVE_PREF_KEY, isAutoSaveEnabled() ? 'false' : 'true');
-    updateAutoSaveToggle();
-    showToast(isAutoSaveEnabled() ? 'Auto-save enabled' : 'Auto-save disabled');
-});
-
-updateAutoSaveToggle();
-setInterval(saveDraft, AUTOSAVE_INTERVAL);
-setTimeout(loadDraft, 500);
 
 // Initialize word count once SunEditor has rendered its content
 setTimeout(updateWordCount, 400);

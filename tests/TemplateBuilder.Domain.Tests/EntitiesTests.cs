@@ -93,16 +93,6 @@ public class TemplateVersionTests
     }
 }
 
-public class TemplateWorkflowTests
-{
-    [Fact]
-    public void Template_defaults_to_Draft_status()
-    {
-        var t = new Template { Name = "X", TemplateType = "Email" };
-        t.Status.Should().Be(TemplateStatus.Draft);
-    }
-}
-
 public class AuditLogTests
 {
     [Fact]

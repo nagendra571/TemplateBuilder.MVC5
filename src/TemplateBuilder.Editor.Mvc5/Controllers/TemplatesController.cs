@@ -28,20 +28,18 @@ public class TemplatesController : TemplateBuilderControllerBase
     private readonly ITemplateEngine _engine;
     private readonly IHtmlSanitizerService _sanitizer;
     private readonly ISampleDataGenerator _sampleDataGenerator;
-    private readonly ITemplateWorkflowService _workflow;
     private readonly IAuditService _audit;
     private readonly IAuditRepository _auditRepository;
     private readonly ITemplatePromotionService _promotion;
     private readonly ITemplateHealthService _health;
 
-    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator, ITemplateWorkflowService workflow, IAuditService audit, IAuditRepository auditRepository, ITemplatePromotionService promotion, ITemplateHealthService health)
+    public TemplatesController(ITemplateRepository repository, ISqlViewDiscoveryService viewDiscovery, ITemplateEngine engine, IHtmlSanitizerService sanitizer, ISampleDataGenerator sampleDataGenerator, IAuditService audit, IAuditRepository auditRepository, ITemplatePromotionService promotion, ITemplateHealthService health)
     {
         _repository = repository;
         _viewDiscovery = viewDiscovery;
         _engine = engine;
         _sanitizer = sanitizer;
         _sampleDataGenerator = sampleDataGenerator;
-        _workflow = workflow;
         _audit = audit;
         _auditRepository = auditRepository;
         _promotion = promotion;
@@ -117,10 +115,7 @@ public class TemplatesController : TemplateBuilderControllerBase
             Name = template.Name,
             TemplateType = template.TemplateType,
             Description = template.Description,
-            Status = template.Status.ToString(),
-            DraftBody = template.DraftBody,
-            ReviewComment = template.ReviewComment,
-            Body = template.DraftBody ?? template.CurrentVersion?.Body ?? string.Empty,
+            Body = template.CurrentVersion?.Body ?? string.Empty,
             CurrentVersionId = template.CurrentVersionId,
             CurrentVersionNumber = template.CurrentVersion?.VersionNumber ?? 0,
             AvailableViews = views.ToList(),
@@ -349,45 +344,6 @@ public class TemplatesController : TemplateBuilderControllerBase
         return JsonOk(new { id = newId });
     }
 
-    [Route("Templates/{id:int}/Draft")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> SaveDraft(int id)
-    {
-        var request = await Request.ReadJsonBodyAsync<SaveDraftRequest>();
-        return await RunWorkflow(() => _workflow.SaveDraftAsync(id, request?.Body ?? string.Empty, CurrentActor));
-    }
-
-    [Route("Templates/{id:int}/SubmitForReview")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> SubmitForReview(int id)
-    {
-        var request = await Request.ReadJsonBodyAsync<SubmitForReviewRequest>();
-        return await RunWorkflow(() => _workflow.SubmitForReviewAsync(id, request?.Body ?? string.Empty, CurrentActor));
-    }
-
-    [Route("Templates/{id:int}/Approve")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> Approve(int id)
-        => await RunWorkflow(() => _workflow.ApproveAsync(id, CurrentActor));
-
-    [Route("Templates/{id:int}/Reject")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> Reject(int id)
-    {
-        var request = await Request.ReadJsonBodyAsync<RejectRequest>();
-        return await RunWorkflow(() => _workflow.RejectAsync(id, request?.Comment ?? string.Empty, CurrentActor));
-    }
-
-    [Route("Templates/{id:int}/CancelReview")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> CancelReview(int id)
-        => await RunWorkflow(() => _workflow.CancelReviewAsync(id, CurrentActor));
-
-    [Route("Templates/{id:int}/Publish")]
-    [HttpPost, ValidateJsonAntiForgeryToken]
-    public async Task<ActionResult> Publish(int id)
-        => await RunWorkflow(() => _workflow.PublishAsync(id, CurrentActor));
-
     [Route("Templates/Export/{id:int}")]
     [HttpGet]
     public async Task<ActionResult> ExportTemplate(int id)
@@ -491,35 +447,6 @@ public class TemplatesController : TemplateBuilderControllerBase
     {
         var rows = await _auditRepository.QueryAsync(new AuditQuery { EntityType = "Template", EntityId = id, PageSize = 100 });
         return JsonOk(rows.Select(a => new { id = a.Id, action = a.Action, actor = a.Actor, occurredAt = a.OccurredAt.ToString("o"), comment = a.Comment }));
-    }
-
-    private async Task<ActionResult> RunWorkflow(Func<Task<TemplateWorkflowResult>> action)
-    {
-        try
-        {
-            return MapWorkflowResult(await action());
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user. Please refresh and try again."));
-        }
-        catch (DbUpdateException)
-        {
-            // PublishVersionAsync retries the unique (TemplateId, VersionNumber) insert 5 times; a
-            // final failure (e.g. sustained concurrent publish) surfaces as 409 per the design spec.
-            return JsonError(409, new ErrorResult("CONFLICT", "This template was modified by another user. Please refresh and try again."));
-        }
-    }
-
-    private ActionResult MapWorkflowResult(TemplateWorkflowResult result)
-    {
-        if (result.Success) return JsonOk(new { status = result.Template?.Status.ToString() });
-        return result.ErrorCode switch
-        {
-            "NOT_FOUND" => JsonError(404, new ErrorResult("TEMPLATE_NOT_FOUND", result.ErrorMessage!)),
-            "CONFLICT" => JsonError(409, new ErrorResult("CONFLICT", result.ErrorMessage!)),
-            _ => JsonError(400, new ErrorResult("VALIDATION_ERROR", result.ErrorMessage!))
-        };
     }
 }
 

@@ -170,14 +170,13 @@ public class TemplateRepositoryTests
     {
         using var ctx = CreateContext();
         var repo = new TemplateRepository(ctx);
-        var t = await repo.CreateAsync(new Template { Name = "Callback Publish", TemplateType = "Email", Status = TemplateStatus.Approved });
+        var t = await repo.CreateAsync(new Template { Name = "Callback Publish", TemplateType = "Email" });
 
         await repo.PublishVersionAsync(t.Id, new TemplateVersion { TemplateId = t.Id, Body = "body" },
-            tb => { tb.Status = TemplateStatus.Published; tb.DraftBody = null; });
+            tb => { tb.Description = "updated by callback"; });
 
         var fetched = await repo.GetByIdAsync(t.Id);
-        fetched!.Status.Should().Be(TemplateStatus.Published);
-        fetched.DraftBody.Should().BeNull();
+        fetched!.Description.Should().Be("updated by callback");
     }
 
     [Fact]
@@ -206,20 +205,18 @@ public class TemplateRepositoryTests
     }
 
     [Fact]
-    public async Task Template_status_and_draft_body_persist()
+    public async Task Template_scalar_properties_persist()
     {
         using var ctx = CreateContext();
         var repo = new TemplateRepository(ctx);
-        var t = await repo.CreateAsync(new Template { Name = "Status Persist", TemplateType = "Email" });
-        t.Status = TemplateStatus.Review;
-        t.DraftBody = "draft";
-        t.ReviewComment = "nope";
+        var t = await repo.CreateAsync(new Template { Name = "Scalar Persist", TemplateType = "Email" });
+        t.Description = "desc";
+        t.SampleData = "{ \"x\": 1 }";
         await repo.UpdateTemplateAsync(t);
 
         var fetched = await repo.GetByIdAsync(t.Id);
-        fetched!.Status.Should().Be(TemplateStatus.Review);
-        fetched.DraftBody.Should().Be("draft");
-        fetched.ReviewComment.Should().Be("nope");
+        fetched!.Description.Should().Be("desc");
+        fetched.SampleData.Should().Be("{ \"x\": 1 }");
     }
 
     private static async Task<Template> CreateTemplate(string name)

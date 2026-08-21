@@ -60,4 +60,14 @@ public class TemplateLifecycleColumnsTests
         (await repo.GetVersionHistoryAsync(t.Id)).Should().BeEmpty();
         (await repo.DeleteAsync(t.Id)).Should().BeFalse();
     }
+
+    [Fact]
+    public async Task SimplifyTemplateStatus_migration_dropped_workflow_columns()
+    {
+        using var ctx = CreateContext();
+        var sql = await ctx.Database.SqlQuery<string>(
+            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'Templates' AND COLUMN_NAME IN ('Status','DraftBody','ReviewComment')")
+            .ToListAsync();
+        sql.Should().BeEmpty();
+    }
 }
