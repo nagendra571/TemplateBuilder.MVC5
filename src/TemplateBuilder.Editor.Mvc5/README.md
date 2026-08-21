@@ -412,6 +412,15 @@ MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints 
 
 ## What's New
 
+#### v1.3.1
+
+- **Fixed: no more "No connection string named 'TemplateBuilderDbContext' could be found"**
+  for consumers who configure only `options.ConnectionString` (e.g. a name like
+  `TemplateDb`). The runtime migrations pipeline now runs against your explicit
+  connection string; the named `TemplateBuilderDbContext` entry is no longer required
+  in your Web.config. (It remains needed only if you use the Package Manager Console
+  `Update-Database` / `Add-Migration` tooling.)
+
 #### v1.3.0
 
 - New `TemplateBuilderEditorOptions.ActorResolver` — supply your own author identity
