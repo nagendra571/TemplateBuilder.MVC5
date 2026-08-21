@@ -141,7 +141,8 @@ public class TemplatesController : TemplateBuilderControllerBase
                 VersionNumber = nextNumber,
                 Body = request.Body,
                 ChangeComment = request.ChangeComment,
-                IsActive = request.IsActive
+                IsActive = request.IsActive,
+                CreatedBy = CurrentActor
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -193,7 +194,8 @@ public class TemplatesController : TemplateBuilderControllerBase
                 VersionNumber = nextNumber,
                 Body = oldBody,
                 ChangeComment = $"Restored from v{sourceVersionNumber}",
-                IsActive = source?.IsActive ?? true
+                IsActive = source?.IsActive ?? true,
+                CreatedBy = CurrentActor
             });
         }
         catch (DbUpdateConcurrencyException)
@@ -329,7 +331,8 @@ public class TemplatesController : TemplateBuilderControllerBase
                 VersionNumber = 1,
                 Body = body,
                 ChangeComment = $"Duplicated from '{source.Name}'",
-                IsActive = isActive
+                IsActive = isActive,
+                CreatedBy = CurrentActor
             });
         }
         catch (DbUpdateException)
