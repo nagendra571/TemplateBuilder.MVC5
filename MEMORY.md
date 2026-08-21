@@ -4,6 +4,14 @@ Persistent cross-session memory for agents working in this repo. Maintained via 
 
 ## Memories
 
+### 2026-08-21: DBA-managed schema support (v1.3.2) — generated schema script + ApplyMigrations
+
+- Client constraint: app SQL login is DML-only ("CREATE TABLE permission denied") → EF6 migrate-on-startup can't work. Solution: package ships a GENERATED schema script (`content/Scripts/TemplateBuilder.schema.<version>.sql`, auto-added to consumer projects on install) + new `options.ApplyMigrations` (default true; false = no initializer installed, no DDL ever attempted).
+- **Script generation recipe:** `new MigratorScriptingDecorator(new DbMigrator(config)).ScriptUpdate(null, null)` — the scripting class is `System.Data.Entity.Migrations.Infrastructure.MigratorScriptingDecorator` (not "DbMigrator..."). `TargetDatabase` needs the TWO-ARG `DbConnectionInfo(rawString, "System.Data.SqlClient")` — the one-arg overload treats the string as a NAME. The migrator creates its context via the convention `TemplateBuilderDbContextFactory`, so `ConnectionStringProvider` must be set during generation too.
+- **Golden-file gate:** `SchemaScriptGenerationTests` regenerates and compares byte-for-byte; `TB_REGEN_SCHEMA=1` rewrites the file. Update the versioned filename + csproj pack entry on every version bump. sqlcmd proof recipe: `docker cp` the script into `mssql-tb`, run with `/opt/mssql-tools18/bin/sqlcmd -C -d <db> -i /tmp/tb-schema.sql`.
+- **ApplyMigrations design gotcha:** every `TemplateBuilderDbContext` constructor re-applies the initializer (`Database.SetInitializer(MigrateDatabaseToLatestVersion...)`) and EF6 triggers it lazily on FIRST QUERY — so a registration-time `SetInitializer(null)` override does NOT hold. The fix is a static `TemplateBuilderDbContext.MigrationsEnabled` flag read in the ctor.
+- Full DBA-flow e2e proven: script-provisioned fresh DB (7 tables + 6 history rows) + sample host with ApplyMigrations=false → create/save/audit all write; sample reverted after.
+
 ### 2026-08-21: Connection-string fix (v1.3.1) — EF6 runtime migrations bypass the design-time factory
 
 - Client bug: "No connection string named 'TemplateBuilderDbContext' could be found" despite `options.ConnectionString` being set. Root cause: EF6's `DbMigrator` (inside `MigrateDatabaseToLatestVersion`) discovers `IDbContextFactory<T>` **by convention** (`{ContextName}Factory` in the context's assembly) at RUNTIME; `TemplateBuilderDbContextFactory.Create()` hardcoded `"name=TemplateBuilderDbContext"` (a design-time-only assumption). The sample host masked the bug by shipping BOTH connection strings in web.config.
