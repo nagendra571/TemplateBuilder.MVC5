@@ -23,8 +23,13 @@ public class TemplateEngine : ITemplateEngine
         var template = await _repository.GetByIdAsync(templateId, ct);
         if (template is null)
             throw new TemplateNotFoundException($"Template {templateId} not found.");
+        if (!template.IsActive)
+            throw new TemplateInactiveException(templateId);
 
-        return await RenderBodyAsync(template.CurrentVersion?.Body ?? string.Empty, model, ct);
+        var activeVersion = await _repository.GetLastActiveVersionAsync(templateId, ct)
+            ?? throw new NoActiveVersionException(templateId);
+
+        return await RenderBodyAsync(activeVersion.Body, model, ct);
     }
 
     public async Task<string> RenderByNameAsync(string templateName, object model, CancellationToken ct = default)
@@ -32,8 +37,13 @@ public class TemplateEngine : ITemplateEngine
         var template = await _repository.GetByNameAsync(templateName, ct);
         if (template is null)
             throw new TemplateNotFoundException($"Template '{templateName}' not found.");
+        if (!template.IsActive)
+            throw new TemplateInactiveException(template.Id);
 
-        return await RenderBodyAsync(template.CurrentVersion?.Body ?? string.Empty, model, ct);
+        var activeVersion = await _repository.GetLastActiveVersionAsync(template.Id, ct)
+            ?? throw new NoActiveVersionException(template.Id);
+
+        return await RenderBodyAsync(activeVersion.Body, model, ct);
     }
 
     public async Task<string> RenderBodyAsync(string body, object model, CancellationToken ct = default)
