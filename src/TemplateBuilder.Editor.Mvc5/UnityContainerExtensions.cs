@@ -5,6 +5,7 @@ using TemplateBuilder.Application.Options;
 using TemplateBuilder.Application.Services;
 using TemplateBuilder.Domain.Interfaces;
 using TemplateBuilder.Editor.Mvc5.Authorization;
+using TemplateBuilder.Infrastructure.EF6;
 using TemplateBuilder.Infrastructure.EF6.Data;
 using TemplateBuilder.Infrastructure.EF6.Repositories;
 
@@ -50,6 +51,14 @@ public static class UnityContainerExtensions
 
         TemplateBuilderAuthorizationFilter.Configure(options.Authorization);
         TemplateBuilderEditorOptions.Current = options;
+
+        // Runtime migrations must run against the consumer's explicit connection string.
+        // Without this, EF6's DbMigrator discovers the design-time TemplateBuilderDbContextFactory
+        // by convention ({ContextName}Factory) at runtime, and its Create() resolves a NAMED
+        // connection string "TemplateBuilderDbContext" from the app config — a consumer who only
+        // sets options.ConnectionString (e.g. a name like "TemplateDb") gets "No connection string
+        // named 'TemplateBuilderDbContext' could be found in the application config file."
+        TemplateBuilderDbContextFactory.ConnectionStringProvider = () => options.ConnectionString;
 
         // Triggers EF6 MigrateDatabaseToLatestVersion on first access — mirrors the ASP.NET Core
         // MigrationHostedService's "migrate on startup" behavior without a hosted-service concept in MVC5.
