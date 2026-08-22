@@ -1,6 +1,6 @@
 # TemplateBuilder.Editor.Mvc5
 
-**Current version: 1.3.2**
+**Current version: 1.3.3**
 
 Embed a full Scriban-powered HTML template management UI into any ASP.NET MVC 5 application running on .NET Framework 4.8. Install the package, register a Unity container, wire up two routes — and your users can create, edit, version, compare, preview, and restore templates with reusable snippets, all wrapped in your own site layout.
 
@@ -428,6 +428,21 @@ MVC 5 has no header-based anti-forgery built in, so the editor's JSON endpoints 
 ---
 
 ## What's New
+
+#### v1.3.3
+
+- **Smoother Activity drawer** — opening no longer "shakes" the page: focus moves into
+  the drawer with `preventScroll` (the browser never scrolls to reveal the still-
+  off-screen close button), and the drawer tab now animates via `transform` on the
+  compositor instead of `right` (no per-frame layout). Both drawer and tab share one
+  easing curve, so open feels as smooth as close. `prefers-reduced-motion` still
+  disables all transitions.
+- **Refined activity timeline** — each event now shows the actor as an initials avatar,
+  the action as a color-coded chip (published = green, deleted/rejected = red,
+  restore/toggle/duplicate = amber, everything else = indigo), the actor name, a
+  relative timestamp (absolute on hover), and comments as a subtle quoted block.
+- **Audit page** — the Activity chart card and the Filters card are now exactly the
+  same height.
 
 #### v1.3.2
 

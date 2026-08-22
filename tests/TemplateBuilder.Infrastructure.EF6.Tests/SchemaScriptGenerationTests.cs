@@ -4,6 +4,7 @@ using System.Data.Entity.Migrations;
 using System.Data.Entity.Migrations.Infrastructure;
 using System.IO;
 using FluentAssertions;
+using TemplateBuilder.Infrastructure.EF6.Data;
 using TemplateBuilder.Infrastructure.EF6.Migrations;
 
 namespace TemplateBuilder.Infrastructure.EF6.Tests;
@@ -27,10 +28,17 @@ public class SchemaScriptGenerationTests
 
     private static readonly string ScriptPath = Path.Combine(
         FindRepoRoot(),
-        "src", "TemplateBuilder.Editor.Mvc5", "Scripts", "TemplateBuilder.schema.1.3.2.sql");
+        "src", "TemplateBuilder.Editor.Mvc5", "Scripts", "TemplateBuilder.schema.1.3.3.sql");
 
     private static string Generate()
     {
+        // ScriptUpdate(null, null) scripts the migrations PENDING on the target database —
+        // the scratch DB must start EMPTY or the generated script silently shrinks (a fully
+        // migrated scratch DB produces an empty string, and the golden gate passes against an
+        // empty committed file: exactly the stale-artifact failure this test exists to catch).
+        using (var cleanup = new TemplateBuilderDbContext(ScratchCs))
+            cleanup.Database.Delete();
+
         var configuration = new Configuration
         {
             TargetDatabase = new DbConnectionInfo(ScratchCs, "System.Data.SqlClient")
