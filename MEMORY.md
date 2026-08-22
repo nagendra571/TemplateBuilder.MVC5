@@ -4,6 +4,13 @@ Persistent cross-session memory for agents working in this repo. Maintained via 
 
 ## Memories
 
+### 2026-08-21: Drawer shake + audit card heights + timeline polish (UI pass)
+
+- **Drawer shake root cause (user-identified, verified):** `openDrawer()` sets `hidden=false`, defers the slide via double-`requestAnimationFrame`, and calls `closeBtn.focus()` synchronously BEFORE the paint — the browser scrolls the page to reveal the off-screen focused element ("page refresh" feel). Fix: `{ preventScroll: true }` on every drawer `.focus()` call (open, close-return, traps). Second: the tab animated `right: 0 → 360px` (layout-triggering); switching to `transform: translateX(calc(-1 * min(360px, 92vw)))` + `cubic-bezier(.32,.72,0,1)` 240ms makes open feel like close. General pattern: focus-inside-panel before open-state applies → preventScroll; grep panel transitions for left/right/top/bottom/width/height → transform.
+- **Audit card equal-height gotcha:** grid `align-items: stretch` alone equalizes the chart + filter cards — do NOT also set `height: 100%` on the filter form: the percentage resolves circularly against the auto-sized grid row and INFLATES the card past the chart card (242→272px). Stretch + `justify-content: space-between` on the form is the whole fix.
+- Timeline item redesign: avatar initials circle + kind-colored action chip (success/danger/warning/info; info = `--accent-subtle`/`--accent`/new `--accent-border` token in both themes) + actor + relative time with absolute `title` + comment as a subtle quoted block (was warning-colored italic). SVGs: lucide-style inline (activity zigzag, X), never emoji.
+- The fork's drawer has NO Tab focus trap (user's analysis assumed one) — open/close focus only. Reduced-motion media query already covers drawer+tab.
+
 ### 2026-08-21: DBA-managed schema support (v1.3.2) — generated schema script + ApplyMigrations
 
 - Client constraint: app SQL login is DML-only ("CREATE TABLE permission denied") → EF6 migrate-on-startup can't work. Solution: package ships a GENERATED schema script (`content/Scripts/TemplateBuilder.schema.<version>.sql`, auto-added to consumer projects on install) + new `options.ApplyMigrations` (default true; false = no initializer installed, no DDL ever attempted).
