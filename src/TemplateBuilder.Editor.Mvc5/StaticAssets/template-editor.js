@@ -50,6 +50,11 @@ function actionKind(action) {
     return 'info';
 }
 
+function avatarInitials(name) {
+    const parts = String(name || '?').trim().split(/\s+/).filter(Boolean);
+    return parts.length ? parts.slice(0, 2).map(p => p[0]).join('').toUpperCase() : '?';
+}
+
 // ── Unsaved-change tracking ───────────────────────────────────────────────────
 
 let _isDirty = false;
@@ -2102,7 +2107,11 @@ function openActivityDrawer() {
     }));
     if (tab) tab.setAttribute('aria-expanded', 'true');
     _activityDrawerOpen = true;
-    if (closeBtn) closeBtn.focus();
+    // preventScroll: the drawer is still off-screen at this instant (the slide starts on
+    // the next paint via the rAF above) — focusing inside it without preventScroll makes
+    // the browser scroll the PAGE to reveal the focused element (the "shake"/"page
+    // refresh" feel). Closing never had this problem: focus returns to the on-screen tab.
+    if (closeBtn) closeBtn.focus({ preventScroll: true });
 }
 
 function closeActivityDrawer() {
@@ -2115,6 +2124,8 @@ function closeActivityDrawer() {
         tab.classList.remove('open');
         tab.setAttribute('aria-expanded', 'false');
     }
+    // Return focus to the opener (the tab is always on-screen — nothing to scroll).
+    if (tab) tab.focus({ preventScroll: true });
     setTimeout(() => { if (!_activityDrawerOpen) drawer.hidden = true; }, 220);
 }
 
@@ -2146,9 +2157,15 @@ async function loadTimeline() {
             <div class="tb-timeline-group-label">${fmtDayLabel(key)}</div>
             ${items.map(r => `
                 <div class="tb-timeline-item" data-kind="${actionKind(r.action)}">
-                    <span class="tb-timeline-action">${escapeHtml(r.action)}</span>
-                    <span class="tb-timeline-meta">${escapeHtml(r.actor)} · ${fmtRelative(r.occurredAt)}</span>
-                    ${r.comment ? `<div class="tb-timeline-comment">${escapeHtml(r.comment)}</div>` : ''}
+                    <span class="tb-timeline-avatar" aria-hidden="true">${avatarInitials(r.actor)}</span>
+                    <div class="tb-timeline-body">
+                        <span class="tb-timeline-chip">${escapeHtml(r.action)}</span>
+                        <span class="tb-timeline-meta">
+                            <span class="tb-timeline-actor">${escapeHtml(r.actor)}</span>
+                            <span class="tb-timeline-time" title="${escapeHtml(new Date(r.occurredAt).toLocaleString())}">${fmtRelative(r.occurredAt)}</span>
+                        </span>
+                        ${r.comment ? `<div class="tb-timeline-comment">${escapeHtml(r.comment)}</div>` : ''}
+                    </div>
                 </div>`).join('')}
         </div>`).join('');
 
