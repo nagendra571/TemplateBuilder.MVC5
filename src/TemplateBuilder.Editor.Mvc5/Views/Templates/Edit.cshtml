@@ -153,13 +153,27 @@
             <!-- Activity drawer (absolutely positioned — never affects grid flow) -->
             <button type="button" id="tb-activity-tab" class="tb-activity-tab"
                     aria-expanded="false" aria-controls="tb-activity-drawer" hidden>
-                Activity <span id="tb-activity-count" class="tb-activity-count">0</span>
+                <span class="tb-activity-tab-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" width="14" height="14"
+                         aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </span>
+                <span class="tb-activity-tab-label">Activity</span>
+                <span id="tb-activity-count" class="tb-activity-count">0</span>
             </button>
             <aside id="tb-activity-drawer" class="tb-activity-drawer" hidden
                    role="dialog" aria-modal="false" aria-label="Activity timeline">
                 <div class="tb-activity-header">
-                    <span>Activity</span>
-                    <button type="button" id="btn-activity-close" class="tb-activity-close" aria-label="Close">&#x2715;</button>
+                    <span class="tb-activity-header-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" width="13" height="13"
+                             aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        Activity
+                    </span>
+                    <button type="button" id="btn-activity-close" class="tb-activity-close" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" width="12" height="12" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
                 </div>
                 <div id="tb-timeline" class="tb-timeline"></div>
             </aside>

@@ -20,6 +20,7 @@
     --accent:           #6366f1;
     --accent-hover:     #818cf8;
     --accent-subtle:    rgba(99,102,241,0.12);
+    --accent-border:    rgba(129,140,248,0.25);
     --text:             #f9fafb;
     --text-secondary:   #d1d5db;
     --text-muted:       #8888aa;
@@ -63,6 +64,7 @@
     --accent:           #6366f1;
     --accent-hover:     #4f46e5;
     --accent-subtle:    #eef2ff;
+    --accent-border:    #c7d2fe;
     --text:             #111827;
     --text-secondary:   #374151;
     --text-muted:       #6b7280;
@@ -1499,15 +1501,27 @@
     font-family: inherit;
     writing-mode: vertical-rl;
     box-shadow: var(--shadow-sm);
-    transition: right var(--transition-md), color var(--transition), border-color var(--transition);
+    transform: translateX(0);
+    /* transform, not right: the drawer already animates transform (compositor-only);
+       right: 0 -> 360px forces layout recalc every frame and is what made opening feel
+       heavy next to the silky transform-based close. Same visual position. */
+    transition: transform 240ms cubic-bezier(.32,.72,0,1), color var(--transition), border-color var(--transition);
 }
 #tb-editor-host .tb-activity-tab:hover { color: var(--accent); border-color: var(--accent); }
+#tb-editor-host .tb-activity-tab:hover .tb-activity-tab-icon,
+#tb-editor-host .tb-activity-tab:focus-visible .tb-activity-tab-icon { color: var(--accent); }
 #tb-editor-host .tb-activity-tab:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(99,102,241,.25);
 }
 #tb-editor-host .tb-activity-tab[hidden] { display: none; }
-#tb-editor-host .tb-activity-tab.open { right: 360px; border-radius: 0; }
+#tb-editor-host .tb-activity-tab.open { transform: translateX(calc(-1 * min(360px, 92vw))); border-radius: 0; }
+#tb-editor-host .tb-activity-tab-icon {
+    writing-mode: horizontal-tb;
+    display: inline-flex;
+    color: var(--text-muted);
+    transition: color var(--transition);
+}
 #tb-editor-host .tb-activity-tab .tb-activity-count {
     writing-mode: horizontal-tb;
     display: inline-flex;
@@ -1538,7 +1552,7 @@
     border-left: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
     transform: translateX(102%);
-    transition: transform var(--transition-md);
+    transition: transform 240ms cubic-bezier(.32,.72,0,1);
 }
 #tb-editor-host .tb-activity-drawer[hidden] { display: none; }
 #tb-editor-host .tb-activity-drawer.open { transform: translateX(0); }
@@ -1556,16 +1570,26 @@
     color: var(--text-muted);
     flex-shrink: 0;
 }
+#tb-editor-host .tb-activity-header-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+#tb-editor-host .tb-activity-header-title svg { color: var(--accent); }
 #tb-editor-host .tb-activity-close {
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 14px;
     cursor: pointer;
-    padding: 2px 8px;
-    border-radius: 4px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     font-family: inherit;
-    line-height: 1.4;
+    line-height: 1;
     transition: color var(--transition), background var(--transition);
 }
 #tb-editor-host .tb-activity-close:hover { color: var(--text); background: var(--surface2); }
@@ -1589,37 +1613,80 @@
 }
 #tb-editor-host .tb-timeline-item {
     position: relative;
-    padding-left: 18px;
-    padding-bottom: 12px;
+    display: flex;
+    gap: 10px;
+    padding-bottom: 14px;
 }
 #tb-editor-host .tb-timeline-item::before {
     content: "";
     position: absolute;
-    left: 4px;
-    top: 16px;
-    bottom: -2px;
+    left: 12px;
+    top: 30px;
+    bottom: -4px;
     width: 2px;
     background: var(--border);
 }
 #tb-editor-host .tb-timeline-item:last-child::before { display: none; }
-#tb-editor-host .tb-timeline-item::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 2px;
-    width: 10px;
-    height: 10px;
+#tb-editor-host .tb-timeline-avatar {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    background: var(--surface);
-    border: 2px solid var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    color: var(--text-secondary);
+    background: var(--surface2);
+    border: 1px solid var(--border);
 }
-#tb-editor-host .tb-timeline-item[data-kind="success"]::after { border-color: var(--success); }
-#tb-editor-host .tb-timeline-item[data-kind="danger"]::after  { border-color: var(--danger); }
-#tb-editor-host .tb-timeline-item[data-kind="warning"]::after { border-color: var(--warning); }
-#tb-editor-host .tb-timeline-item[data-kind="info"]::after    { border-color: var(--accent); }
-#tb-editor-host .tb-timeline-action { font-weight: 600; color: var(--text); display: block; font-size: 13px; }
-#tb-editor-host .tb-timeline-meta { font-size: 11px; color: var(--text-muted); }
-#tb-editor-host .tb-timeline-comment { font-size: 12px; color: var(--warning); font-style: italic; margin-top: 3px; }
+#tb-editor-host .tb-timeline-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+#tb-editor-host .tb-timeline-chip {
+    align-self: flex-start;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#tb-editor-host .tb-timeline-item[data-kind="success"] .tb-timeline-chip { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+#tb-editor-host .tb-timeline-item[data-kind="danger"] .tb-timeline-chip  { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger-border); }
+#tb-editor-host .tb-timeline-item[data-kind="warning"] .tb-timeline-chip { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+#tb-editor-host .tb-timeline-item[data-kind="info"] .tb-timeline-chip    { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border); }
+#tb-editor-host .tb-timeline-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+#tb-editor-host .tb-timeline-actor { color: var(--text-secondary); font-weight: 600; }
+#tb-editor-host .tb-timeline-time { white-space: nowrap; }
+#tb-editor-host .tb-timeline-comment {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--surface2);
+    border-left: 2px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 9px;
+    margin-top: 4px;
+    font-style: italic;
+}
 #tb-editor-host .tb-timeline-empty { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
 #tb-editor-host .tb-snippet-meta { font-size:11px; color: var(--text-muted); display:block; }
 
@@ -1726,13 +1793,13 @@
     margin-top: 3px;
 }
 
-/* Chart + filter grid */
+/* Chart + filter grid — stretch so both cards are the same height */
 #tb-editor-host .tb-audit-top {
     display: grid;
     grid-template-columns: 1.45fr 1fr;
     gap: 12px;
     margin-bottom: 12px;
-    align-items: start;
+    align-items: stretch;
 }
 #tb-editor-host .tb-audit-card {
     background: var(--surface);
@@ -1759,12 +1826,15 @@
     color: var(--text-muted);
 }
 
-/* Filters */
+/* Filters — the grid cell stretches it to the chart card's height (align-items: stretch);
+   rows distribute to fill that height. No height:100% here — it resolves circularly against
+   the auto-sized grid row and inflates the card past the chart card. */
 #tb-editor-host .tb-audit-filters {
     padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 9px;
+    justify-content: space-between;
 }
 #tb-editor-host .tb-audit-filters-row {
     display: flex;
