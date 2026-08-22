@@ -61,7 +61,7 @@ as "anonymous" in the version history. **No backfill.** Deliverable: **v2.3.0**.
      `CreatedBy` column exists).
 
 7. **Verify end-to-end before claiming done.** Use the sample host (`dotnet run --project
-   src/TemplateBuilder.Web`, https://localhost:7275/): run the resolver path (template
+   src/TemplateBuilder.Web`, https://localhost:7275/ or if that not work then a new port): run the resolver path (template
    create → save version with the `X-TB-Actor: alice` header → version history + audit row
    show `alice`), the fallback path (browser save without the header → version history
    shows `anonymous`), and the legacy path (pre-existing null `CreatedBy` rows render
